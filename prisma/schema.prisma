@@ -1,0 +1,131 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  createdAt DateTime @default(now())
+
+  enrollments      Enrollment[]
+  taskAttempts     TaskAttempt[]
+  conceptProgress  ConceptProgress[]
+
+  @@index([clerkId])
+}
+
+model Stack {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String
+
+  enrollments     Enrollment[]
+  tasks           Task[]
+  conceptProgress ConceptProgress[]
+
+  @@index([slug])
+}
+
+model Enrollment {
+  id        String   @id @default(cuid())
+  userId    String
+  stackId   String
+  createdAt DateTime @default(now())
+  status    EnrollmentStatus @default(ACTIVE)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stack    Stack     @relation(fields: [stackId], references: [id], onDelete: Cascade)
+  sessions Session[]
+
+  @@unique([userId, stackId])
+  @@index([userId])
+  @@index([stackId])
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+}
+
+model Session {
+  id           String    @id @default(cuid())
+  enrollmentId String
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  enrollment   Enrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  taskAttempts TaskAttempt[]
+
+  @@index([enrollmentId])
+}
+
+model Task {
+  id             String   @id @default(cuid())
+  stackId        String
+  internalOrder  Int
+  conceptTags    String[]
+  difficultyLevel DifficultyLevel
+  isDetour       Boolean  @default(false)
+
+  stack        Stack         @relation(fields: [stackId], references: [id], onDelete: Cascade)
+  taskAttempts TaskAttempt[]
+
+  @@unique([stackId, internalOrder])
+  @@index([stackId])
+  @@index([isDetour])
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model TaskAttempt {
+  id          String    @id @default(cuid())
+  taskId      String
+  sessionId   String
+  userId      String
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  hintsUsed   Int       @default(0)
+  status      TaskAttemptStatus @default(IN_PROGRESS)
+
+  task    Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([sessionId])
+  @@index([userId])
+  @@index([status])
+}
+
+enum TaskAttemptStatus {
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+model ConceptProgress {
+  id         String  @id @default(cuid())
+  userId     String
+  stackId    String
+  conceptTag String
+  strength   Float   @default(0.0)
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stack Stack @relation(fields: [stackId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, stackId, conceptTag])
+  @@index([userId])
+  @@index([stackId])
+}
