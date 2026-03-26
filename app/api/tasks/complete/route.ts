@@ -44,13 +44,17 @@ export async function POST(req: Request) {
     });
 
     if (!taskAttempt) {
+      console.error('Task attempt not found:', taskAttemptId);
       return NextResponse.json({ error: 'Task attempt not found' }, { status: 404 });
     }
 
     // Verify ownership
     if (taskAttempt.userId !== user.id) {
+      console.error('Unauthorized access attempt:', { userId: user.id, attemptUserId: taskAttempt.userId });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
+
+    console.log('Completing task attempt:', taskAttemptId);
 
     // Mark task attempt as completed
     await prisma.taskAttempt.update({
@@ -61,13 +65,14 @@ export async function POST(req: Request) {
       },
     });
 
+    console.log('Task attempt marked as completed');
+
     // Update concept progress for each concept tag
     const conceptTags = taskAttempt.task.conceptTags;
     const stackId = taskAttempt.task.stackId;
 
     for (const conceptTag of conceptTags) {
       // Calculate strength increase based on hints used
-      // 0 hints = +0.3, 1 hint = +0.2, 2 hints = +0.15, 3+ hints = +0.1
       let strengthIncrease = 0.1;
       if (taskAttempt.hintsUsed === 0) strengthIncrease = 0.3;
       else if (taskAttempt.hintsUsed === 1) strengthIncrease = 0.2;
@@ -106,24 +111,69 @@ export async function POST(req: Request) {
       });
     }
 
+    console.log('Concept progress updated');
+
     // Generate story log entry
-    const storyEntry = await generateStoryLogEntry({
-      conceptTags: taskAttempt.task.conceptTags,
-      difficultyLevel: taskAttempt.task.difficultyLevel,
-      stackName: taskAttempt.task.stack.name,
-    });
+    let storyEntry = 'Completed a task.';
+    try {
+      console.log('Generating story entry for task:', {
+        conceptTags: taskAttempt.task.conceptTags,
+        difficultyLevel: taskAttempt.task.difficultyLevel,
+        stackName: taskAttempt.task.stack.name,
+      });
+      
+      storyEntry = await generateStoryLogEntry({
+        conceptTags: taskAttempt.task.conceptTags,
+        difficultyLevel: taskAttempt.task.difficultyLevel,
+        stackName: taskAttempt.task.stack.name,
+      });
+      
+      console.log('Story entry generated successfully:', storyEntry);
+    } catch (error) {
+      console.error('Error generating story entry:', error);
+      console.error('Error details:', error instanceof Error ? error.message : String(error));
+      // Continue with default entry
+    }
 
     // Update enrollment story log
-    const enrollment = taskAttempt.session.enrollment;
-    const currentLog = (enrollment.storyLog as string[]) || [];
-    const updatedLog = [...currentLog, storyEntry];
+    try {
+      const enrollment = taskAttempt.session.enrollment;
+      
+      // Safely handle storyLog - it might be null, undefined, or a JSON string
+      let currentLog: string[] = [];
+      if (enrollment.storyLog) {
+        if (Array.isArray(enrollment.storyLog)) {
+          currentLog = enrollment.storyLog as string[];
+        } else if (typeof enrollment.storyLog === 'string') {
+          try {
+            currentLog = JSON.parse(enrollment.storyLog);
+          } catch {
+            currentLog = [];
+          }
+        }
+      }
+      
+      const updatedLog = [...currentLog, storyEntry];
 
-    await prisma.enrollment.update({
-      where: { id: enrollment.id },
-      data: {
-        storyLog: updatedLog,
-      },
-    });
+      console.log('Updating story log:', {
+        enrollmentId: enrollment.id,
+        currentLogLength: currentLog.length,
+        newEntry: storyEntry,
+      });
+
+      await prisma.enrollment.update({
+        where: { id: enrollment.id },
+        data: {
+          storyLog: updatedLog,
+        },
+      });
+
+      console.log('Story log updated successfully');
+    } catch (error) {
+      console.error('Error updating story log:', error);
+      console.error('Error details:', error instanceof Error ? error.message : String(error));
+      // Don't fail the entire request if story log update fails
+    }
 
     return NextResponse.json({
       success: true,
@@ -133,7 +183,7 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error('Error completing task:', error);
     return NextResponse.json(
-      { error: 'Failed to complete task' },
+      { error: error instanceof Error ? error.message : 'Failed to complete task' },
       { status: 500 }
     );
   }

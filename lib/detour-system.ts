@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import Groq from 'groq-sdk';
 
 /**
  * Detects if a user is struggling on a task
@@ -92,7 +93,11 @@ export async function generateStoryLogEntry(
   }
 ): Promise<string> {
   try {
-    const Groq = (await import('groq-sdk')).default;
+    if (!process.env.GROQ_API_KEY) {
+      console.error('GROQ_API_KEY is not set');
+      return 'Completed a task.';
+    }
+
     const groq = new Groq({
       apiKey: process.env.GROQ_API_KEY,
     });

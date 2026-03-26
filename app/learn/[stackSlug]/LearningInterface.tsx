@@ -110,8 +110,12 @@ export default function LearningInterface({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to complete task');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to complete task');
       }
+
+      const result = await response.json();
+      console.log('Task completed:', result);
 
       // Fetch next task
       await fetchCurrentTask();
@@ -121,7 +125,8 @@ export default function LearningInterface({
       setCanUseHints(false);
     } catch (err) {
       console.error('Error completing task:', err);
-      alert('Failed to complete task. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to complete task';
+      alert(`Error: ${errorMessage}. Please try again or refresh the page.`);
     } finally {
       setIsCompleting(false);
     }
@@ -224,9 +229,9 @@ export default function LearningInterface({
             Your Journey
           </h3>
           <div className="space-y-3">
-            {taskData.storyLog.length > 0 ? (
+            {taskData.storyLog && taskData.storyLog.length > 0 ? (
               <>
-                {taskData.storyLog.map((entry, index) => (
+                {taskData.storyLog.slice(-4).map((entry, index) => (
                   <div key={index} className="text-sm text-slate-300 leading-relaxed border-l-2 border-purple-500 pl-3">
                     {entry}
                   </div>

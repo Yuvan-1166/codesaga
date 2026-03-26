@@ -1,5 +1,5 @@
 import 'dotenv/config'; // Load environment variables
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, DifficultyLevel } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { readFileSync, existsSync } from 'fs';
@@ -93,28 +93,28 @@ async function main() {
         stackId: expressStack.id,
         internalOrder: 1,
         conceptTags: ['express-basics', 'routing', 'middleware'],
-        difficultyLevel: 'EASY',
+        difficultyLevel: DifficultyLevel.EASY,
         isDetour: false,
       },
       {
         stackId: expressStack.id,
         internalOrder: 2,
         conceptTags: ['error-handling', 'middleware', 'async-await'],
-        difficultyLevel: 'MEDIUM',
+        difficultyLevel: DifficultyLevel.MEDIUM,
         isDetour: false,
       },
       {
         stackId: expressStack.id,
         internalOrder: 3,
         conceptTags: ['authentication', 'jwt', 'security'],
-        difficultyLevel: 'MEDIUM',
+        difficultyLevel: DifficultyLevel.MEDIUM,
         isDetour: false,
       },
       {
         stackId: expressStack.id,
         internalOrder: 4,
         conceptTags: ['database', 'crud', 'validation'],
-        difficultyLevel: 'HARD',
+        difficultyLevel: DifficultyLevel.HARD,
         isDetour: false,
       },
       // Detour tasks
@@ -122,21 +122,21 @@ async function main() {
         stackId: expressStack.id,
         internalOrder: 101,
         conceptTags: ['middleware', 'express-basics'],
-        difficultyLevel: 'EASY',
+        difficultyLevel: DifficultyLevel.EASY,
         isDetour: true,
       },
       {
         stackId: expressStack.id,
         internalOrder: 102,
         conceptTags: ['error-handling', 'async-await'],
-        difficultyLevel: 'EASY',
+        difficultyLevel: DifficultyLevel.EASY,
         isDetour: true,
       },
       {
         stackId: expressStack.id,
         internalOrder: 103,
         conceptTags: ['authentication', 'security'],
-        difficultyLevel: 'MEDIUM',
+        difficultyLevel: DifficultyLevel.MEDIUM,
         isDetour: true,
       },
     ];
