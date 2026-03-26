@@ -11,4 +11,6 @@ export default defineConfig({
   datasource: {
     url: process.env["DATABASE_URL"],
   },
+  // SSL configuration for cloud databases like Aiven
+  datasourceUrl: process.env["DATABASE_URL"],
 });

@@ -57,7 +57,13 @@ pnpm prisma migrate dev --name init
 - Subscribe to events: `user.created`, `user.updated`
 - Copy the signing secret to `CLERK_WEBHOOK_SECRET`
 
-6. Run the development server:
+6. Seed the database with initial stacks:
+
+```bash
+pnpm db:seed
+```
+
+7. Run the development server:
 
 ```bash
 pnpm dev
