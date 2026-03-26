@@ -48,6 +48,7 @@ export default function LearningInterface({
   const [isCompleting, setIsCompleting] = useState(false);
   const [code, setCode] = useState('// Your code will appear here\n// Start writing your solution\n\nfunction example() {\n  console.log(\'Hello, CodeSaga!\');\n}\n');
   const [taskDescription, setTaskDescription] = useState<string>('Loading task description...');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Fetch current task
   useEffect(() => {
@@ -160,10 +161,11 @@ export default function LearningInterface({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-600">Loading your task...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-purple-50">
+        <div className="text-center animate-fade-in">
+          <div className="spinner w-16 h-16 mx-auto mb-6" />
+          <p className="text-slate-600 text-lg font-medium">Loading your task...</p>
+          <p className="text-slate-500 text-sm mt-2">Preparing your learning environment</p>
         </div>
       </div>
     );
@@ -171,9 +173,14 @@ export default function LearningInterface({
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <p className="text-red-600 text-lg">{error}</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-purple-50">
+        <div className="text-center animate-scale-in">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <p className="text-red-600 text-xl font-semibold">{error}</p>
         </div>
       </div>
     );
@@ -193,118 +200,238 @@ export default function LearningInterface({
   };
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">{stackName}</h1>
-            <div className="flex items-center space-x-4 mt-1">
-              <span className="text-sm text-slate-600">
-                Time: {formatTime(timeOnTask)}
-              </span>
-              <span className="text-sm text-slate-600">
-                Hints: {hintsUsed}
-              </span>
-              <span className="text-sm text-slate-600">
-                Difficulty: {taskData.task.difficultyLevel}
-              </span>
+    <div className="h-screen flex flex-col bg-[#1a1a1a]">
+      {/* Drawable Sidebar - Journey */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-80 bg-gradient-to-b from-[#1e1e2e] to-[#181825] border-r border-purple-500/30 transform transition-transform duration-300 ease-in-out ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex flex-col h-full">
+          {/* Sidebar Header */}
+          <div className="flex items-center justify-between p-4 border-b border-purple-500/30">
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+              <h2 className="text-lg font-semibold text-white">Your Journey</h2>
             </div>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-1 hover:bg-purple-500/20 rounded transition-colors"
+            >
+              <svg className="w-5 h-5 text-slate-400 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
-          <button
-            onClick={handleComplete}
-            disabled={isCompleting}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-          >
-            {isCompleting ? 'Completing...' : 'Mark as Complete'}
-          </button>
-        </div>
-      </div>
 
-      {/* Split Panel Layout with Story Log Sidebar */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Story Log Sidebar */}
-        <div className="w-64 bg-slate-800 text-slate-200 p-4 overflow-y-auto flex-shrink-0">
-          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">
-            Your Journey
-          </h3>
-          <div className="space-y-3">
-            {taskData.storyLog && taskData.storyLog.length > 0 ? (
-              <>
-                {taskData.storyLog.slice(-4).map((entry, index) => (
-                  <div key={index} className="text-sm text-slate-300 leading-relaxed border-l-2 border-purple-500 pl-3">
-                    {entry}
+          {/* Story Log Content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {taskData?.storyLog && taskData.storyLog.length > 0 ? (
+              <div className="space-y-4">
+                {taskData.storyLog.map((entry, index) => (
+                  <div key={index} className="group animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 mt-1.5">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full group-hover:scale-150 transition-transform" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm text-slate-300 leading-relaxed group-hover:text-white transition-colors">
+                          {entry}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 ))}
-                <div className="text-sm text-slate-500 italic pt-2 border-t border-slate-700">
-                  Something is waiting after this.
+                <div className="mt-6 pt-4 border-t border-purple-500/30">
+                  <div className="flex items-start space-x-3 text-slate-500">
+                    <svg className="w-4 h-4 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <p className="text-sm italic">Something is waiting after this...</p>
+                  </div>
                 </div>
-              </>
+              </div>
             ) : (
-              <div className="text-sm text-slate-500 italic">
-                Your story begins here...
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <svg className="w-16 h-16 text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                <p className="text-slate-500 text-sm">Your story begins here...</p>
+                <p className="text-slate-600 text-xs mt-2">Complete tasks to build your journey</p>
               </div>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Left Panel - Working Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Task Description */}
-          <div className="bg-white border-b border-slate-200 p-6">
-            <div className="max-w-4xl">
-              <h2 className="text-lg font-semibold text-slate-900 mb-2">
-                Current Task
-              </h2>
-              <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
-                {taskDescription}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {taskData.task.conceptTags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="px-3 py-1 bg-purple-100 text-purple-700 text-sm rounded-full"
-                  >
-                    {tag}
-                  </span>
-                ))}
+      {/* Overlay when sidebar is open */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Top Navigation Bar */}
+      <div className="bg-[#282828] border-b border-[#3a3a3a] px-4 py-2 flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          {/* Journey Toggle Button */}
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 hover:bg-[#3a3a3a] rounded transition-colors group"
+            title="Open Journey"
+          >
+            <svg className="w-5 h-5 text-slate-400 group-hover:text-purple-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+          </button>
+
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <span className="text-white font-semibold text-sm">{stackName}</span>
+          </div>
+          <div className="flex items-center space-x-2 text-xs">
+            <span className={`px-2 py-1 rounded ${
+              taskData.task.difficultyLevel === 'EASY' ? 'bg-green-500/20 text-green-400' :
+              taskData.task.difficultyLevel === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400' :
+              'bg-red-500/20 text-red-400'
+            }`}>
+              {taskData.task.difficultyLevel}
+            </span>
+            <span className="text-slate-400">•</span>
+            <span className="text-slate-400">{formatTime(timeOnTask)}</span>
+            <span className="text-slate-400">•</span>
+            <span className="text-slate-400">{hintsUsed} hints used</span>
+          </div>
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleComplete}
+            disabled={isCompleting}
+            className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+          >
+            {isCompleting ? (
+              <>
+                <div className="spinner w-3 h-3" />
+                <span>Submitting...</span>
+              </>
+            ) : (
+              <>
+                <span>Submit</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Panel - Description */}
+        <div className="w-[45%] flex flex-col bg-[#1a1a1a] border-r border-[#3a3a3a]">
+          {/* Description Content */}
+          <div className="flex-1 overflow-y-auto p-6 text-slate-300">
+            <div className="prose prose-invert max-w-none">
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold text-white mb-4">Current Task</h2>
+                <p className="text-slate-300 leading-relaxed whitespace-pre-wrap mb-6">
+                  {taskDescription}
+                </p>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">
+                  Concepts
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {taskData.task.conceptTags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-3 py-1 bg-purple-500/20 text-purple-300 text-xs rounded-full border border-purple-500/30"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-
-          {/* Code Editor */}
-          <div className="flex-1 overflow-hidden bg-slate-900">
-            <Editor
-              height="100%"
-              defaultLanguage="javascript"
-              value={code}
-              onChange={(value) => setCode(value || '')}
-              theme="vs-dark"
-              options={{
-                readOnly: false,
-                minimap: { enabled: false },
-                fontSize: 14,
-                lineNumbers: 'on',
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                tabSize: 2,
-                wordWrap: 'on',
-                formatOnPaste: true,
-                formatOnType: true,
-              }}
-            />
-          </div>
         </div>
 
-        {/* Right Panel - AI Companion */}
-        <div className="w-96 flex-shrink-0">
-          <CompanionChat
-            taskContext={taskContext}
-            onHintUsed={handleHintUsed}
-            canUseHints={canUseHints}
-            onTaskDescriptionReceived={setTaskDescription}
-            taskAttemptId={taskData.taskAttempt.id}
-          />
+        {/* Right Panel - Code Editor + AI Companion */}
+        <div className="flex-1 flex flex-col">
+          {/* Code Editor Section */}
+          <div className="flex-1 flex flex-col bg-[#1e1e1e]">
+            {/* Editor Tabs */}
+            <div className="flex items-center justify-between border-b border-[#3a3a3a] bg-[#252526] px-4">
+              <div className="flex items-center">
+                <button className="px-4 py-2 text-sm font-medium text-white bg-[#1e1e1e] border-b-2 border-purple-500">
+                  <span className="flex items-center space-x-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
+                    <span>Code</span>
+                  </span>
+                </button>
+              </div>
+              <div className="flex items-center space-x-2 py-2">
+                <select className="bg-[#3a3a3a] text-slate-300 text-xs px-2 py-1 rounded border border-[#4a4a4a] focus:outline-none focus:border-purple-500">
+                  <option>JavaScript</option>
+                  <option>TypeScript</option>
+                  <option>Python</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Monaco Editor */}
+            <div className="flex-1 overflow-hidden">
+              <Editor
+                height="100%"
+                defaultLanguage="javascript"
+                value={code}
+                onChange={(value) => setCode(value || '')}
+                theme="vs-dark"
+                options={{
+                  readOnly: false,
+                  minimap: { enabled: true },
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  tabSize: 2,
+                  wordWrap: 'off',
+                  formatOnPaste: true,
+                  formatOnType: true,
+                  fontFamily: "'Fira Code', 'Cascadia Code', 'Consolas', monospace",
+                  fontLigatures: true,
+                  cursorBlinking: 'smooth',
+                  smoothScrolling: true,
+                  padding: { top: 16, bottom: 16 },
+                  renderLineHighlight: 'all',
+                  bracketPairColorization: { enabled: true },
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Bottom Panel - AI Companion */}
+          <div className="h-80 border-t border-[#3a3a3a] bg-[#1a1a1a]">
+            <CompanionChat
+              taskContext={taskContext}
+              onHintUsed={handleHintUsed}
+              canUseHints={canUseHints}
+              onTaskDescriptionReceived={setTaskDescription}
+              taskAttemptId={taskData.taskAttempt.id}
+            />
+          </div>
         </div>
       </div>
     </div>
