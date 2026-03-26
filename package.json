@@ -15,9 +15,11 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.6",
+    "@monaco-editor/react": "^4.7.0",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "ai": "^6.0.138",
+    "groq-sdk": "^1.1.2",
     "next": "16.2.1",
     "pg": "^8.20.0",
     "react": "19.2.4",

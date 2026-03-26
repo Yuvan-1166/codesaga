@@ -72,13 +72,66 @@ async function main() {
     },
   ];
 
+  const createdStacks: any[] = [];
+
   for (const stack of stacks) {
-    await prisma.stack.upsert({
+    const created = await prisma.stack.upsert({
       where: { slug: stack.slug },
       update: stack,
       create: stack,
     });
+    createdStacks.push(created);
     console.log(`✓ Created/updated stack: ${stack.name}`);
+  }
+
+  // Create tasks for Express.js stack
+  const expressStack = createdStacks.find((s) => s.slug === 'express');
+  
+  if (expressStack) {
+    const expressTasks = [
+      {
+        stackId: expressStack.id,
+        internalOrder: 1,
+        conceptTags: ['express-basics', 'routing', 'middleware'],
+        difficultyLevel: 'EASY',
+        isDetour: false,
+      },
+      {
+        stackId: expressStack.id,
+        internalOrder: 2,
+        conceptTags: ['error-handling', 'middleware', 'async-await'],
+        difficultyLevel: 'MEDIUM',
+        isDetour: false,
+      },
+      {
+        stackId: expressStack.id,
+        internalOrder: 3,
+        conceptTags: ['authentication', 'jwt', 'security'],
+        difficultyLevel: 'MEDIUM',
+        isDetour: false,
+      },
+      {
+        stackId: expressStack.id,
+        internalOrder: 4,
+        conceptTags: ['database', 'crud', 'validation'],
+        difficultyLevel: 'HARD',
+        isDetour: false,
+      },
+    ];
+
+    for (const task of expressTasks) {
+      await prisma.task.upsert({
+        where: {
+          stackId_internalOrder: {
+            stackId: task.stackId,
+            internalOrder: task.internalOrder,
+          },
+        },
+        update: task,
+        create: task,
+      });
+    }
+    console.log(`✓ Created/updated ${expressTasks.length} tasks for Express.js`);
   }
 
   console.log('Seeding completed!');
