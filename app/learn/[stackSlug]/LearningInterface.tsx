@@ -333,105 +333,93 @@ export default function LearningInterface({
         </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Content Area - Three Column Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel - Description */}
-        <div className="w-[45%] flex flex-col bg-[#1a1a1a] border-r border-[#3a3a3a]">
-          {/* Description Content */}
-          <div className="flex-1 overflow-y-auto p-6 text-slate-300">
-            <div className="prose prose-invert max-w-none">
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold text-white mb-4">Current Task</h2>
-                <p className="text-slate-300 leading-relaxed whitespace-pre-wrap mb-6">
-                  {taskDescription}
-                </p>
-              </div>
+        {/* Left Panel - Task Description */}
+        <div className="w-[380px] flex-shrink-0 flex flex-col bg-[#1a1a1a] border-r border-[#3a3a3a]">
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-white mb-3">Current Task</h2>
+              <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+                {taskDescription}
+              </p>
+            </div>
 
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">
-                  Concepts
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {taskData.task.conceptTags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-3 py-1 bg-purple-500/20 text-purple-300 text-xs rounded-full border border-purple-500/30"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+            <div>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+                Concepts
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {taskData.task.conceptTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="px-2 py-1 bg-purple-500/20 text-purple-300 text-xs rounded-full border border-purple-500/30"
+                  >
+                    {tag}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Panel - Code Editor + AI Companion */}
-        <div className="flex-1 flex flex-col">
-          {/* Code Editor Section */}
-          <div className="flex-1 flex flex-col bg-[#1e1e1e]">
-            {/* Editor Tabs */}
-            <div className="flex items-center justify-between border-b border-[#3a3a3a] bg-[#252526] px-4">
-              <div className="flex items-center">
-                <button className="px-4 py-2 text-sm font-medium text-white bg-[#1e1e1e] border-b-2 border-purple-500">
-                  <span className="flex items-center space-x-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                    </svg>
-                    <span>Code</span>
-                  </span>
-                </button>
-              </div>
-              <div className="flex items-center space-x-2 py-2">
-                <select className="bg-[#3a3a3a] text-slate-300 text-xs px-2 py-1 rounded border border-[#4a4a4a] focus:outline-none focus:border-purple-500">
-                  <option>JavaScript</option>
-                  <option>TypeScript</option>
-                  <option>Python</option>
-                </select>
-              </div>
+        {/* Center Panel - Code Editor */}
+        <div className="flex-1 flex flex-col bg-[#1e1e1e]">
+          {/* Editor Header */}
+          <div className="flex items-center justify-between border-b border-[#3a3a3a] bg-[#252526] px-4 py-2">
+            <div className="flex items-center space-x-2">
+              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+              </svg>
+              <span className="text-sm text-slate-300">solution.js</span>
             </div>
-
-            {/* Monaco Editor */}
-            <div className="flex-1 overflow-hidden">
-              <Editor
-                height="100%"
-                defaultLanguage="javascript"
-                value={code}
-                onChange={(value) => setCode(value || '')}
-                theme="vs-dark"
-                options={{
-                  readOnly: false,
-                  minimap: { enabled: true },
-                  fontSize: 14,
-                  lineNumbers: 'on',
-                  scrollBeyondLastLine: false,
-                  automaticLayout: true,
-                  tabSize: 2,
-                  wordWrap: 'off',
-                  formatOnPaste: true,
-                  formatOnType: true,
-                  fontFamily: "'Fira Code', 'Cascadia Code', 'Consolas', monospace",
-                  fontLigatures: true,
-                  cursorBlinking: 'smooth',
-                  smoothScrolling: true,
-                  padding: { top: 16, bottom: 16 },
-                  renderLineHighlight: 'all',
-                  bracketPairColorization: { enabled: true },
-                }}
-              />
-            </div>
+            <select className="bg-[#3a3a3a] text-slate-300 text-xs px-2 py-1 rounded border border-[#4a4a4a] focus:outline-none focus:border-purple-500">
+              <option>JavaScript</option>
+              <option>TypeScript</option>
+              <option>Python</option>
+            </select>
           </div>
 
-          {/* Bottom Panel - AI Companion */}
-          <div className="h-80 border-t border-[#3a3a3a] bg-[#1a1a1a]">
-            <CompanionChat
-              taskContext={taskContext}
-              onHintUsed={handleHintUsed}
-              canUseHints={canUseHints}
-              onTaskDescriptionReceived={setTaskDescription}
-              taskAttemptId={taskData.taskAttempt.id}
+          {/* Monaco Editor */}
+          <div className="flex-1 overflow-hidden">
+            <Editor
+              height="100%"
+              defaultLanguage="javascript"
+              value={code}
+              onChange={(value) => setCode(value || '')}
+              theme="vs-dark"
+              options={{
+                readOnly: false,
+                minimap: { enabled: true },
+                fontSize: 14,
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                tabSize: 2,
+                wordWrap: 'off',
+                formatOnPaste: true,
+                formatOnType: true,
+                fontFamily: "'Fira Code', 'Cascadia Code', 'Consolas', monospace",
+                fontLigatures: true,
+                cursorBlinking: 'smooth',
+                smoothScrolling: true,
+                padding: { top: 16, bottom: 16 },
+                renderLineHighlight: 'all',
+                bracketPairColorization: { enabled: true },
+              }}
             />
           </div>
+        </div>
+
+        {/* Right Panel - AI Companion */}
+        <div className="w-[420px] flex-shrink-0 border-l border-[#3a3a3a]">
+          <CompanionChat
+            taskContext={taskContext}
+            onHintUsed={handleHintUsed}
+            canUseHints={canUseHints}
+            onTaskDescriptionReceived={setTaskDescription}
+            taskAttemptId={taskData.taskAttempt.id}
+          />
         </div>
       </div>
     </div>

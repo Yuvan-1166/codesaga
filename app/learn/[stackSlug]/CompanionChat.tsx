@@ -178,60 +178,50 @@ export default function CompanionChat({ taskContext, onHintUsed, canUseHints, on
 
   return (
     <div className="flex flex-col h-full bg-[#1a1a1a]">
-      {/* Header with Tabs */}
-      <div className="flex items-center justify-between border-b border-[#3a3a3a] bg-[#252526] px-4">
-        <div className="flex items-center">
-          <button className="px-4 py-2 text-sm font-medium text-white border-b-2 border-purple-500 bg-[#1a1a1a]">
-            <span className="flex items-center space-x-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-              </svg>
-              <span>AI Companion</span>
-            </span>
-          </button>
-          <button className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">
-            Test Cases
-          </button>
-        </div>
-        <div className="flex items-center space-x-2 py-2">
-          {!canUseHints && (
-            <div className="flex items-center space-x-1 text-xs text-slate-500">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              <span>Hints unlock after 3 minutes</span>
-            </div>
-          )}
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-[#3a3a3a] bg-[#252526] px-4 py-3">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-white">AI Companion</h2>
+            <p className="text-xs text-slate-400">Your guide through this journey</p>
+          </div>
         </div>
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message, index) => (
           <div
             key={index}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
+            className="animate-fade-in"
           >
-            <div className="flex items-start space-x-2 max-w-[80%]">
+            <div className="flex items-start space-x-2">
               {message.role === 'assistant' && (
-                <div className="w-6 h-6 bg-purple-600 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-7 h-7 bg-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                   </svg>
                 </div>
               )}
-              <div
-                className={`rounded-lg px-3 py-2 text-sm ${
-                  message.role === 'user'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-[#2a2a2a] text-slate-300 border border-[#3a3a3a]'
-                }`}
-              >
-                <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+              <div className="flex-1">
+                <div
+                  className={`rounded-lg px-3 py-2 text-sm ${
+                    message.role === 'user'
+                      ? 'bg-purple-600 text-white ml-8'
+                      : 'bg-[#2a2a2a] text-slate-300 border border-[#3a3a3a]'
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                </div>
               </div>
               {message.role === 'user' && (
-                <div className="w-6 h-6 bg-slate-600 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-7 h-7 bg-slate-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                 </div>
@@ -240,10 +230,10 @@ export default function CompanionChat({ taskContext, onHintUsed, canUseHints, on
           </div>
         ))}
         {isLoading && (
-          <div className="flex justify-start animate-fade-in">
+          <div className="animate-fade-in">
             <div className="flex items-start space-x-2">
-              <div className="w-6 h-6 bg-purple-600 rounded flex items-center justify-center flex-shrink-0">
-                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-7 h-7 bg-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
@@ -260,43 +250,61 @@ export default function CompanionChat({ taskContext, onHintUsed, canUseHints, on
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="border-t border-[#3a3a3a] bg-[#252526] p-3">
-        {/* Hint Buttons */}
-        <div className="flex items-center space-x-2 mb-2">
+      {/* Hint Buttons Section */}
+      <div className="border-t border-[#3a3a3a] bg-[#1e1e1e] p-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Quick Hints</span>
+          {!canUseHints && (
+            <div className="flex items-center space-x-1 text-xs text-slate-500">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <span>Unlocks in 3 min</span>
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
           <button
             onClick={() => handleHint('nudge')}
             disabled={!canUseHints || isLoading}
-            className="px-3 py-1.5 text-xs font-medium bg-[#3a3a3a] text-slate-300 rounded hover:bg-[#4a4a4a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-1"
+            className="px-3 py-2 text-xs font-medium bg-[#2a2a2a] text-slate-300 rounded hover:bg-[#3a3a3a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-[#3a3a3a] hover:border-purple-500/50"
           >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Nudge</span>
+            <div className="flex flex-col items-center space-y-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Nudge</span>
+            </div>
           </button>
           <button
             onClick={() => handleHint('shape')}
             disabled={!canUseHints || isLoading}
-            className="px-3 py-1.5 text-xs font-medium bg-[#3a3a3a] text-slate-300 rounded hover:bg-[#4a4a4a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-1"
+            className="px-3 py-2 text-xs font-medium bg-[#2a2a2a] text-slate-300 rounded hover:bg-[#3a3a3a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-[#3a3a3a] hover:border-purple-500/50"
           >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-            </svg>
-            <span>Shape</span>
+            <div className="flex flex-col items-center space-y-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+              </svg>
+              <span>Shape</span>
+            </div>
           </button>
           <button
             onClick={() => handleHint('solution')}
             disabled={!canUseHints || isLoading}
-            className="px-3 py-1.5 text-xs font-medium bg-[#3a3a3a] text-slate-300 rounded hover:bg-[#4a4a4a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-1"
+            className="px-3 py-2 text-xs font-medium bg-[#2a2a2a] text-slate-300 rounded hover:bg-[#3a3a3a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-[#3a3a3a] hover:border-purple-500/50"
           >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Solution</span>
+            <div className="flex flex-col items-center space-y-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Solution</span>
+            </div>
           </button>
         </div>
+      </div>
 
-        {/* Chat Input */}
+      {/* Input Area */}
+      <div className="border-t border-[#3a3a3a] bg-[#252526] p-4">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -318,7 +326,7 @@ export default function CompanionChat({ taskContext, onHintUsed, canUseHints, on
             className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
           >
             <span>Send</span>
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
             </svg>
           </button>
