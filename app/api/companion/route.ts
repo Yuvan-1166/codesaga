@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 import { COMPANION_SYSTEM_PROMPT } from '@/lib/constants';
+import { prisma } from '@/lib/prisma';
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -15,10 +16,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { messages, taskContext, hintType } = await req.json();
+    const { messages, taskContext, hintType, taskAttemptId } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'Messages array is required' }, { status: 400 });
+    }
+
+    // Increment message count for struggle detection
+    if (taskAttemptId && !hintType) {
+      try {
+        await prisma.taskAttempt.update({
+          where: { id: taskAttemptId },
+          data: {
+            messageCount: {
+              increment: 1,
+            },
+          },
+        });
+      } catch (error) {
+        console.error('Error updating message count:', error);
+      }
     }
 
     // Build the system prompt with task context
@@ -40,6 +57,11 @@ export async function POST(req: Request) {
       systemPrompt += '\n\nThe user has requested the code shape/structure. Show them function signatures, class structures, or the overall pattern, but do NOT implement the logic.';
     } else if (hintType === 'solution') {
       systemPrompt += '\n\nThe user has requested a complete solution. Provide one working implementation, then ask them to explain it back to you in their own words to ensure understanding.';
+    }
+
+    // Add detour reframing instruction if needed
+    if (taskContext?.detourTriggered) {
+      systemPrompt += '\n\nIMPORTANT: A detour has been triggered. Naturally reframe the situation as a plot development. Make it feel like a natural next step. Say something like "Before we wire up the next piece, I want to make sure something is solid..." Never use words like "detour", "prerequisite", "remedial", or "going back". Make it feel like forward progress.';
     }
 
     // Create the chat completion with streaming

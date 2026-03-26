@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { generateStoryLogEntry } from '@/lib/detour-system';
 
 export async function POST(req: Request) {
   try {
@@ -32,6 +33,11 @@ export async function POST(req: Request) {
         task: {
           include: {
             stack: true,
+          },
+        },
+        session: {
+          include: {
+            enrollment: true,
           },
         },
       },
@@ -100,9 +106,29 @@ export async function POST(req: Request) {
       });
     }
 
+    // Generate story log entry
+    const storyEntry = await generateStoryLogEntry({
+      conceptTags: taskAttempt.task.conceptTags,
+      difficultyLevel: taskAttempt.task.difficultyLevel,
+      stackName: taskAttempt.task.stack.name,
+    });
+
+    // Update enrollment story log
+    const enrollment = taskAttempt.session.enrollment;
+    const currentLog = (enrollment.storyLog as string[]) || [];
+    const updatedLog = [...currentLog, storyEntry];
+
+    await prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: {
+        storyLog: updatedLog,
+      },
+    });
+
     return NextResponse.json({
       success: true,
       message: 'Task completed successfully',
+      storyEntry,
     });
   } catch (error) {
     console.error('Error completing task:', error);

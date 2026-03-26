@@ -117,6 +117,28 @@ async function main() {
         difficultyLevel: 'HARD',
         isDetour: false,
       },
+      // Detour tasks
+      {
+        stackId: expressStack.id,
+        internalOrder: 101,
+        conceptTags: ['middleware', 'express-basics'],
+        difficultyLevel: 'EASY',
+        isDetour: true,
+      },
+      {
+        stackId: expressStack.id,
+        internalOrder: 102,
+        conceptTags: ['error-handling', 'async-await'],
+        difficultyLevel: 'EASY',
+        isDetour: true,
+      },
+      {
+        stackId: expressStack.id,
+        internalOrder: 103,
+        conceptTags: ['authentication', 'security'],
+        difficultyLevel: 'MEDIUM',
+        isDetour: true,
+      },
     ];
 
     for (const task of expressTasks) {
@@ -131,7 +153,7 @@ async function main() {
         create: task,
       });
     }
-    console.log(`✓ Created/updated ${expressTasks.length} tasks for Express.js`);
+    console.log(`✓ Created/updated ${expressTasks.length} tasks for Express.js (including ${expressTasks.filter(t => t.isDetour).length} detours)`);
   }
 
   console.log('Seeding completed!');

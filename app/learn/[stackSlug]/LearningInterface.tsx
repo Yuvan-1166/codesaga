@@ -17,16 +17,21 @@ type TaskData = {
     startedAt: string;
     hintsUsed: number;
     status: string;
+    messageCount: number;
+    wasDetour: boolean;
   };
   task: {
     id: string;
     conceptTags: string[];
     difficultyLevel: string;
+    isDetour: boolean;
   };
   stack: {
     name: string;
     slug: string;
   };
+  storyLog: string[];
+  detourTriggered?: boolean;
 };
 
 export default function LearningInterface({
@@ -179,6 +184,7 @@ export default function LearningInterface({
     difficultyLevel: taskData.task.difficultyLevel,
     hintsUsed,
     timeOnTask: formatTime(timeOnTask),
+    detourTriggered: taskData.detourTriggered,
   };
 
   return (
@@ -210,8 +216,33 @@ export default function LearningInterface({
         </div>
       </div>
 
-      {/* Split Panel Layout */}
+      {/* Split Panel Layout with Story Log Sidebar */}
       <div className="flex-1 flex overflow-hidden">
+        {/* Story Log Sidebar */}
+        <div className="w-64 bg-slate-800 text-slate-200 p-4 overflow-y-auto flex-shrink-0">
+          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">
+            Your Journey
+          </h3>
+          <div className="space-y-3">
+            {taskData.storyLog.length > 0 ? (
+              <>
+                {taskData.storyLog.map((entry, index) => (
+                  <div key={index} className="text-sm text-slate-300 leading-relaxed border-l-2 border-purple-500 pl-3">
+                    {entry}
+                  </div>
+                ))}
+                <div className="text-sm text-slate-500 italic pt-2 border-t border-slate-700">
+                  Something is waiting after this.
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-slate-500 italic">
+                Your story begins here...
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Left Panel - Working Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Task Description */}
@@ -267,6 +298,7 @@ export default function LearningInterface({
             onHintUsed={handleHintUsed}
             canUseHints={canUseHints}
             onTaskDescriptionReceived={setTaskDescription}
+            taskAttemptId={taskData.taskAttempt.id}
           />
         </div>
       </div>

@@ -14,13 +14,15 @@ type CompanionChatProps = {
     difficultyLevel: string;
     hintsUsed: number;
     timeOnTask: string;
+    detourTriggered?: boolean;
   };
   onHintUsed: () => void;
   canUseHints: boolean;
   onTaskDescriptionReceived: (description: string) => void;
+  taskAttemptId: string;
 };
 
-export default function CompanionChat({ taskContext, onHintUsed, canUseHints, onTaskDescriptionReceived }: CompanionChatProps) {
+export default function CompanionChat({ taskContext, onHintUsed, canUseHints, onTaskDescriptionReceived, taskAttemptId }: CompanionChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -116,6 +118,7 @@ export default function CompanionChat({ taskContext, onHintUsed, canUseHints, on
           messages: [...messages, userMessage],
           taskContext,
           hintType,
+          taskAttemptId,
         }),
       });
 
