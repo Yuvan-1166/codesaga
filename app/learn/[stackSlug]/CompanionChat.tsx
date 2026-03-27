@@ -538,7 +538,7 @@ export default function CompanionChat({
                     setApiError(false);
                     sendMessage(lastUserMessage);
                   }}
-                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors cursor-pointer"
                 >
                   Retry
                 </button>
@@ -567,7 +567,7 @@ export default function CompanionChat({
           <button
             onClick={() => handleHint('nudge')}
             disabled={!canUseHints || isLoading}
-            className="px-3 py-2 text-xs font-medium bg-[#2a2a2a] text-slate-300 rounded hover:bg-[#3a3a3a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-[#3a3a3a] hover:border-purple-500/50"
+            className="px-3 py-2 text-xs font-medium bg-[#2a2a2a] text-slate-300 rounded hover:bg-[#3a3a3a] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors border border-[#3a3a3a] hover:border-purple-500/50"
           >
             <div className="flex flex-col items-center space-y-1">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -579,7 +579,7 @@ export default function CompanionChat({
           <button
             onClick={() => handleHint('shape')}
             disabled={!canUseHints || isLoading}
-            className="px-3 py-2 text-xs font-medium bg-[#2a2a2a] text-slate-300 rounded hover:bg-[#3a3a3a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-[#3a3a3a] hover:border-purple-500/50"
+            className="px-3 py-2 text-xs font-medium bg-[#2a2a2a] text-slate-300 rounded hover:bg-[#3a3a3a] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors border border-[#3a3a3a] hover:border-purple-500/50"
           >
             <div className="flex flex-col items-center space-y-1">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -591,7 +591,7 @@ export default function CompanionChat({
           <button
             onClick={() => handleHint('solution')}
             disabled={!canUseHints || isLoading}
-            className="px-3 py-2 text-xs font-medium bg-[#2a2a2a] text-slate-300 rounded hover:bg-[#3a3a3a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-[#3a3a3a] hover:border-purple-500/50"
+            className="px-3 py-2 text-xs font-medium bg-[#2a2a2a] text-slate-300 rounded hover:bg-[#3a3a3a] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors border border-[#3a3a3a] hover:border-purple-500/50"
           >
             <div className="flex flex-col items-center space-y-1">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -637,7 +637,7 @@ export default function CompanionChat({
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center space-x-1"
           >
             <span>Send</span>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

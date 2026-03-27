@@ -36,7 +36,7 @@ export default function Navbar({ streakDays = 0, showDashboardLink = true }: Nav
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center space-x-3 group">
+          <Link href="/dashboard" className="flex items-center space-x-3 group cursor-pointer">
             <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
               <svg
                 className="w-6 h-6 text-white"
@@ -62,7 +62,7 @@ export default function Navbar({ streakDays = 0, showDashboardLink = true }: Nav
             {showDashboardLink && (
               <Link
                 href="/dashboard"
-                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 cursor-pointer ${
                   isActive('/dashboard')
                     ? 'bg-purple-100 text-purple-700'
                     : 'text-slate-700 hover:bg-slate-100'
@@ -73,7 +73,7 @@ export default function Navbar({ streakDays = 0, showDashboardLink = true }: Nav
             )}
             <Link
               href="/skills"
-              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 cursor-pointer ${
                 isActive('/skills')
                   ? 'bg-purple-100 text-purple-700'
                   : 'text-slate-700 hover:bg-slate-100'
@@ -83,7 +83,7 @@ export default function Navbar({ streakDays = 0, showDashboardLink = true }: Nav
             </Link>
             <Link
               href="/settings"
-              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 cursor-pointer ${
                 isActive('/settings')
                   ? 'bg-purple-100 text-purple-700'
                   : 'text-slate-700 hover:bg-slate-100'
@@ -166,7 +166,7 @@ export default function Navbar({ streakDays = 0, showDashboardLink = true }: Nav
         <div className="flex items-center justify-around py-2">
           <Link
             href="/dashboard"
-            className={`flex flex-col items-center space-y-1 px-4 py-2 rounded-lg transition-colors ${
+            className={`flex flex-col items-center space-y-1 px-4 py-2 rounded-lg transition-colors cursor-pointer ${
               isActive('/dashboard')
                 ? 'text-purple-600'
                 : 'text-slate-600'
@@ -179,7 +179,7 @@ export default function Navbar({ streakDays = 0, showDashboardLink = true }: Nav
           </Link>
           <Link
             href="/skills"
-            className={`flex flex-col items-center space-y-1 px-4 py-2 rounded-lg transition-colors ${
+            className={`flex flex-col items-center space-y-1 px-4 py-2 rounded-lg transition-colors cursor-pointer ${
               isActive('/skills')
                 ? 'text-purple-600'
                 : 'text-slate-600'
@@ -192,7 +192,7 @@ export default function Navbar({ streakDays = 0, showDashboardLink = true }: Nav
           </Link>
           <Link
             href="/settings"
-            className={`flex flex-col items-center space-y-1 px-4 py-2 rounded-lg transition-colors ${
+            className={`flex flex-col items-center space-y-1 px-4 py-2 rounded-lg transition-colors cursor-pointer ${
               isActive('/settings')
                 ? 'text-purple-600'
                 : 'text-slate-600'

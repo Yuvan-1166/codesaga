@@ -4,6 +4,10 @@ import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import CompanionChat from './CompanionChat';
 import Navbar from '../../components/Navbar';
+import TestPanel from './TestPanel';
+import ConsolePanel from './ConsolePanel';
+import { executeBrowserCode, runBrowserTests } from '@/lib/execution/browser-executor';
+import type { TestCase } from '@/lib/execution/browser-executor';
 
 type LearningInterfaceProps = {
   enrollmentId: string;
@@ -64,6 +68,15 @@ export default function LearningInterface({
   const [checkpointPending, setCheckpointPending] = useState(false);
   const [stackCompleted, setStackCompleted] = useState(false);
   const [editorSaveTimeout, setEditorSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [testResults, setTestResults] = useState<any[]>([]);
+  const [testsPassed, setTestsPassed] = useState(0);
+  const [testsTotal, setTestsTotal] = useState(0);
+  const [isRunningTests, setIsRunningTests] = useState(false);
+  const [isRunningCode, setIsRunningCode] = useState(false);
+  const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'console' | 'tests'>('console');
+  const [hasTestCases, setHasTestCases] = useState(false);
+  const [testCases, setTestCases] = useState<TestCase[]>([]);
 
   // Auto-save editor state (debounced)
   const saveEditorState = async (content: string, taskAttemptId: string) => {
@@ -146,9 +159,31 @@ export default function LearningInterface({
       setHintsUsed(data.taskAttempt.hintsUsed);
       setCheckpointPending(data.checkpointPending || false);
       
+      // Set test cases if available
+      if (data.testCases && Array.isArray(data.testCases) && data.testCases.length > 0) {
+        setHasTestCases(true);
+        setTestCases(data.testCases);
+      } else {
+        setHasTestCases(false);
+        setTestCases([]);
+      }
+      
+      // Restore test results if available
+      if (data.taskAttempt.testResults) {
+        setTestResults(data.taskAttempt.testResults);
+        setTestsPassed(data.taskAttempt.passedTests || 0);
+        setTestsTotal(data.taskAttempt.totalTests || 0);
+      } else {
+        setTestResults([]);
+        setTestsPassed(0);
+        setTestsTotal(0);
+      }
+      
       // Restore editor state if it exists
       if (data.taskAttempt.editorState) {
         setCode(data.taskAttempt.editorState);
+      } else if (data.starterCode) {
+        setCode(data.starterCode);
       } else {
         // Reset to default if no saved state
         setCode('// Your code will appear here\n// Start writing your solution\n\nfunction example() {\n  console.log(\'Hello, CodeSaga!\');\n}\n');
@@ -161,10 +196,109 @@ export default function LearningInterface({
     }
   };
 
-  const handleComplete = async () => {
+  const handleRunCode = async () => {
+    setIsRunningCode(true);
+    setConsoleOutput([]);
+    setActiveTab('console');
+
+    try {
+      // Execute in browser
+      const result = await executeBrowserCode(code, 5000);
+      
+      if (result.success) {
+        setConsoleOutput([
+          ...result.consoleOutput,
+          result.output !== undefined ? `=> ${JSON.stringify(result.output)}` : '',
+        ].filter(Boolean));
+      } else {
+        setConsoleOutput([
+          ...result.consoleOutput,
+          `ERROR: ${result.error}`,
+        ]);
+      }
+    } catch (error) {
+      setConsoleOutput([`ERROR: ${error instanceof Error ? error.message : String(error)}`]);
+    } finally {
+      setIsRunningCode(false);
+    }
+  };
+
+  const handleRunTests = async () => {
+    if (!taskData || !hasTestCases) return;
+
+    setIsRunningTests(true);
+    setActiveTab('tests');
+
+    try {
+      // Run tests in browser
+      const result = await runBrowserTests(code, testCases);
+      
+      setTestResults(result.results);
+      setTestsPassed(result.passed);
+      setTestsTotal(result.total);
+
+      // Update task attempt with results
+      await fetch('/api/tasks/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          taskAttemptId: taskData.taskAttempt.id,
+        }),
+      });
+    } catch (error) {
+      console.error('Error running tests:', error);
+      setConsoleOutput([`ERROR: ${error instanceof Error ? error.message : String(error)}`]);
+      setActiveTab('console');
+    } finally {
+      setIsRunningTests(false);
+    }
+  };
+
+  const handleSubmit = async () => {
     if (!taskData) return;
 
-    setIsCompleting(true);
+    // If task has test cases, validate first
+    if (hasTestCases) {
+      if (testsPassed !== testsTotal) {
+        alert('All tests must pass before submitting');
+        return;
+      }
+
+      // Submit code with validation
+      setIsCompleting(true);
+      try {
+        const submitResponse = await fetch('/api/tasks/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            taskAttemptId: taskData.taskAttempt.id,
+            testResults: { results: testResults, passed: testsPassed, total: testsTotal },
+          }),
+        });
+
+        if (!submitResponse.ok) {
+          const errorData = await submitResponse.json();
+          throw new Error(errorData.error || 'Failed to submit code');
+        }
+
+        const submitResult = await submitResponse.json();
+        
+        if (!submitResult.canComplete) {
+          alert(submitResult.message);
+          setIsCompleting(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Error submitting code:', err);
+        alert(`Error: ${err instanceof Error ? err.message : 'Failed to submit'}`);
+        setIsCompleting(false);
+        return;
+      }
+    }
+
+    // Complete the task
     try {
       const response = await fetch('/api/tasks/complete', {
         method: 'POST',
@@ -192,7 +326,6 @@ export default function LearningInterface({
       // Check if checkpoint is pending
       if (result.checkpointPending) {
         setCheckpointPending(true);
-        // Don't fetch next task yet - wait for checkpoint to be cleared
         return;
       }
 
@@ -202,6 +335,10 @@ export default function LearningInterface({
       // Reset state
       setTimeOnTask(0);
       setCanUseHints(false);
+      setTestResults([]);
+      setTestsPassed(0);
+      setTestsTotal(0);
+      setConsoleOutput([]);
     } catch (err) {
       console.error('Error completing task:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to complete task';
@@ -321,7 +458,7 @@ export default function LearningInterface({
               <div className="text-center">
                 <a
                   href="/dashboard"
-                  className="inline-flex items-center space-x-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
+                  className="inline-flex items-center space-x-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors cursor-pointer"
                 >
                   <span>Choose another stack</span>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -372,7 +509,7 @@ export default function LearningInterface({
             </div>
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="p-1 hover:bg-purple-500/20 rounded transition-colors"
+              className="p-1 hover:bg-purple-500/20 rounded transition-colors cursor-pointer"
             >
               <svg className="w-5 h-5 text-slate-400 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -422,7 +559,7 @@ export default function LearningInterface({
           <div className="border-t border-purple-500/30 p-4">
             <a
               href="/skills"
-              className="flex items-center justify-center space-x-2 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 hover:text-purple-200 rounded-lg transition-colors group"
+              className="flex items-center justify-center space-x-2 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 hover:text-purple-200 rounded-lg transition-colors group cursor-pointer"
             >
               <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -447,7 +584,7 @@ export default function LearningInterface({
           {/* Journey Toggle Button */}
           <button
             onClick={() => setIsSidebarOpen(true)}
-            className="p-2 hover:bg-[#3a3a3a] rounded transition-colors group"
+            className="p-2 hover:bg-[#3a3a3a] rounded transition-colors group cursor-pointer"
             title="Open Journey"
           >
             <svg className="w-5 h-5 text-slate-400 group-hover:text-purple-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -478,10 +615,22 @@ export default function LearningInterface({
           </div>
         </div>
         <div className="flex items-center space-x-2">
+          {hasTestCases && (
+            <div className="flex items-center space-x-2 mr-2">
+              <span className="text-xs text-slate-400">Tests:</span>
+              <span className={`text-xs font-medium ${
+                testsPassed === testsTotal && testsTotal > 0
+                  ? 'text-green-400'
+                  : 'text-amber-400'
+              }`}>
+                {testsPassed}/{testsTotal}
+              </span>
+            </div>
+          )}
           <button
-            onClick={handleComplete}
-            disabled={isCompleting || checkpointPending}
-            className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+            onClick={handleSubmit}
+            disabled={isCompleting || checkpointPending || (hasTestCases && testsPassed !== testsTotal)}
+            className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center space-x-1"
           >
             {isCompleting ? (
               <>
@@ -490,7 +639,7 @@ export default function LearningInterface({
               </>
             ) : (
               <>
-                <span>Submit</span>
+                <span>Submit Solution</span>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
@@ -530,7 +679,7 @@ export default function LearningInterface({
           </div>
         </div>
 
-        {/* Center Panel - Code Editor */}
+        {/* Center Panel - Code Editor + Bottom Panel */}
         <div className="flex-1 flex flex-col bg-[#1e1e1e]">
           {/* Editor Header */}
           <div className="flex items-center justify-between border-b border-[#3a3a3a] bg-[#252526] px-4 py-2">
@@ -575,6 +724,57 @@ export default function LearningInterface({
                 bracketPairColorization: { enabled: true },
               }}
             />
+          </div>
+
+          {/* Bottom Panel - Console/Tests */}
+          <div className="h-80 border-t border-[#3a3a3a]">
+            {/* Tab Switcher */}
+            <div className="flex items-center border-b border-[#3a3a3a] bg-[#252526]">
+              <button
+                onClick={() => setActiveTab('console')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 cursor-pointer ${
+                  activeTab === 'console'
+                    ? 'text-blue-400 border-blue-400'
+                    : 'text-slate-400 border-transparent hover:text-slate-300'
+                }`}
+              >
+                Console
+              </button>
+              {hasTestCases && (
+                <button
+                  onClick={() => setActiveTab('tests')}
+                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 cursor-pointer ${
+                    activeTab === 'tests'
+                      ? 'text-purple-400 border-purple-400'
+                      : 'text-slate-400 border-transparent hover:text-slate-300'
+                  }`}
+                >
+                  Tests {testResults.length > 0 && `(${testsPassed}/${testsTotal})`}
+                </button>
+              )}
+            </div>
+
+            {/* Panel Content */}
+            <div className="h-[calc(100%-41px)]">
+              {activeTab === 'console' ? (
+                <ConsolePanel
+                  output={consoleOutput}
+                  isRunning={isRunningCode}
+                  onRun={handleRunCode}
+                  onClear={() => setConsoleOutput([])}
+                />
+              ) : (
+                <TestPanel
+                  results={testResults}
+                  passed={testsPassed}
+                  total={testsTotal}
+                  isRunning={isRunningTests}
+                  onRunTests={handleRunTests}
+                  onSubmit={handleSubmit}
+                  canSubmit={!isCompleting && !checkpointPending}
+                />
+              )}
+            </div>
           </div>
         </div>
 

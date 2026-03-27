@@ -54,6 +54,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
+    // Check if task has test cases and if they passed
+    const testCases = taskAttempt.Task.testCases;
+    if (testCases && Array.isArray(testCases) && testCases.length > 0) {
+      // Require all tests to pass
+      if (taskAttempt.passedTests !== taskAttempt.totalTests) {
+        return NextResponse.json({
+          error: 'All tests must pass before completing the task',
+          passed: taskAttempt.passedTests,
+          total: taskAttempt.totalTests,
+        }, { status: 400 });
+      }
+    }
+
     console.log('Completing task attempt:', taskAttemptId);
 
     // Mark task attempt as completed

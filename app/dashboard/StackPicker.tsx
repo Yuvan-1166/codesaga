@@ -83,13 +83,13 @@ export default function StackPicker({ stacks, activeEnrollmentId, completedStack
               <div className="flex space-x-3">
                 <button
                   onClick={() => handleEnroll(showWarning)}
-                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-medium text-sm"
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-medium text-sm cursor-pointer"
                 >
                   Continue Anyway
                 </button>
                 <button
                   onClick={() => setShowWarning(null)}
-                  className="px-4 py-2 bg-white text-amber-900 border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors font-medium text-sm"
+                  className="px-4 py-2 bg-white text-amber-900 border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors font-medium text-sm cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -108,7 +108,7 @@ export default function StackPicker({ stacks, activeEnrollmentId, completedStack
               key={stack.id}
               onClick={() => handleEnroll(stack.id)}
               disabled={enrolling !== null}
-              className="card card-hover group relative p-8 text-left disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:scale-105 animate-fade-in"
+              className="card card-hover group relative p-8 text-left disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all duration-300 hover:scale-105 animate-fade-in"
               style={{ animationDelay: `${index * 100}ms` }}
             >
               {/* Completion Badge */}

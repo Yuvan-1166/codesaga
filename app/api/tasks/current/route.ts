@@ -251,6 +251,9 @@ export async function GET(req: Request) {
         messageCount: taskAttempt.messageCount,
         wasDetour: taskAttempt.wasDetour,
         editorState: taskAttempt.editorState,
+        testResults: taskAttempt.testResults,
+        passedTests: taskAttempt.passedTests,
+        totalTests: taskAttempt.totalTests,
       },
       task: {
         id: taskAttempt.Task.id,
@@ -267,6 +270,8 @@ export async function GET(req: Request) {
       checkpointPending: enrollment.checkpointPending,
       companionMessages,
       isReturning,
+      testCases: taskAttempt.Task.testCases,
+      starterCode: taskAttempt.Task.starterCode,
     });
   } catch (error) {
     console.error('Error fetching current task:', error);

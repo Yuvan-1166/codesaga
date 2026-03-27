@@ -251,13 +251,13 @@ export default async function DashboardPage() {
               <div className="flex space-x-3">
                 <a
                   href={`/learn/${activeEnrollment.Stack.slug}`}
-                  className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-center"
+                  className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-center cursor-pointer"
                 >
                   Continue Learning →
                 </a>
                 <a
                   href="/skills"
-                  className="px-6 py-3 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium"
+                  className="px-6 py-3 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium cursor-pointer"
                 >
                   View Skills
                 </a>
