@@ -49,17 +49,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Stack not found' }, { status: 404 });
     }
 
-    // Create enrollment and first session in a transaction
+    // Create enrollment first
     const enrollment = await prisma.enrollment.create({
       data: {
         userId: user.id,
         stackId: stack.id,
         status: 'ACTIVE',
-        sessions: {
-          create: {
-            startedAt: new Date(),
-          },
-        },
+      },
+    });
+
+    // Create first session
+    await prisma.session.create({
+      data: {
+        enrollmentId: enrollment.id,
+        startedAt: new Date(),
       },
     });
 

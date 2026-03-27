@@ -95,6 +95,7 @@ async function main() {
         conceptTags: ['express-basics', 'routing', 'middleware'],
         difficultyLevel: DifficultyLevel.EASY,
         isDetour: false,
+        milestoneGroup: 1,
       },
       {
         stackId: expressStack.id,
@@ -102,6 +103,7 @@ async function main() {
         conceptTags: ['error-handling', 'middleware', 'async-await'],
         difficultyLevel: DifficultyLevel.MEDIUM,
         isDetour: false,
+        milestoneGroup: 1,
       },
       {
         stackId: expressStack.id,
@@ -109,6 +111,7 @@ async function main() {
         conceptTags: ['authentication', 'jwt', 'security'],
         difficultyLevel: DifficultyLevel.MEDIUM,
         isDetour: false,
+        milestoneGroup: 2,
       },
       {
         stackId: expressStack.id,
@@ -116,14 +119,16 @@ async function main() {
         conceptTags: ['database', 'crud', 'validation'],
         difficultyLevel: DifficultyLevel.HARD,
         isDetour: false,
+        milestoneGroup: 2,
       },
-      // Detour tasks
+      // Detour tasks - inherit milestoneGroup from the tasks they support
       {
         stackId: expressStack.id,
         internalOrder: 101,
         conceptTags: ['middleware', 'express-basics'],
         difficultyLevel: DifficultyLevel.EASY,
         isDetour: true,
+        milestoneGroup: 1,
       },
       {
         stackId: expressStack.id,
@@ -131,6 +136,7 @@ async function main() {
         conceptTags: ['error-handling', 'async-await'],
         difficultyLevel: DifficultyLevel.EASY,
         isDetour: true,
+        milestoneGroup: 1,
       },
       {
         stackId: expressStack.id,
@@ -138,6 +144,7 @@ async function main() {
         conceptTags: ['authentication', 'security'],
         difficultyLevel: DifficultyLevel.MEDIUM,
         isDetour: true,
+        milestoneGroup: 2,
       },
     ];
 

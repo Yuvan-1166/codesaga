@@ -15,18 +15,45 @@ type CompanionChatProps = {
     hintsUsed: number;
     timeOnTask: string;
     detourTriggered?: boolean;
+    stackCompleted?: boolean;
+    storyLogEntries?: string[];
   };
   onHintUsed: () => void;
   canUseHints: boolean;
   onTaskDescriptionReceived: (description: string) => void;
   taskAttemptId: string;
+  checkpointPending: boolean;
+  onCheckpointCleared: () => void;
+  enrollmentId: string;
+  stackCompleted?: boolean;
+  companionMessages?: Array<{
+    role: string;
+    content: string;
+    createdAt: string;
+  }>;
+  isReturning?: boolean;
 };
 
-export default function CompanionChat({ taskContext, onHintUsed, canUseHints, onTaskDescriptionReceived, taskAttemptId }: CompanionChatProps) {
+export default function CompanionChat({ 
+  taskContext, 
+  onHintUsed, 
+  canUseHints, 
+  onTaskDescriptionReceived, 
+  taskAttemptId,
+  checkpointPending,
+  onCheckpointCleared,
+  enrollmentId,
+  stackCompleted = false,
+  companionMessages = [],
+  isReturning = false,
+}: CompanionChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [checkpointInitiated, setCheckpointInitiated] = useState(false);
+  const [apiError, setApiError] = useState(false);
+  const [lastUserMessage, setLastUserMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -37,13 +64,51 @@ export default function CompanionChat({ taskContext, onHintUsed, canUseHints, on
     scrollToBottom();
   }, [messages]);
 
-  // Send initial message when component mounts
+  // Initialize with message history or send initial message
   useEffect(() => {
     if (!hasInitialized) {
       setHasInitialized(true);
-      sendInitialMessage();
+      
+      // If we have companion messages (returning user), restore them
+      if (companionMessages && companionMessages.length > 0) {
+        const restoredMessages = companionMessages.map(msg => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+        }));
+        setMessages(restoredMessages);
+        
+        // Set task description from first assistant message
+        const firstAssistant = restoredMessages.find(m => m.role === 'assistant');
+        if (firstAssistant) {
+          onTaskDescriptionReceived(firstAssistant.content);
+        }
+        
+        // Send returning user message if this is a returning user
+        if (isReturning) {
+          sendReturningUserMessage();
+        }
+      } else if (stackCompleted) {
+        // Send stack completion message
+        sendStackCompletionMessage();
+      } else {
+        // New user - send initial message
+        sendInitialMessage();
+      }
     }
-  }, [hasInitialized]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Initiate checkpoint when checkpointPending becomes true
+  useEffect(() => {
+    if (checkpointPending && !checkpointInitiated) {
+      setCheckpointInitiated(true);
+      initiateCheckpoint();
+    }
+    if (!checkpointPending && checkpointInitiated) {
+      setCheckpointInitiated(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkpointPending]);
 
   const sendInitialMessage = async () => {
     setIsLoading(true);
@@ -97,6 +162,200 @@ export default function CompanionChat({ taskContext, onHintUsed, canUseHints, on
     }
   };
 
+  const sendReturningUserMessage = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/companion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'user',
+              content: 'I just returned to continue working.',
+            },
+          ],
+          taskContext: {
+            ...taskContext,
+            returningUser: true,
+          },
+          taskAttemptId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (errorData.error === 'AI_UNAVAILABLE') {
+          setApiError(true);
+          return;
+        }
+        throw new Error('Failed to get response');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantMessage = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value);
+          assistantMessage += chunk;
+        }
+        
+        setMessages((prev) => [...prev, { role: 'assistant', content: assistantMessage }]);
+      }
+    } catch (error) {
+      console.error('Error sending returning user message:', error);
+      // Fail silently for returning user message
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const sendStackCompletionMessage = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/companion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'user',
+              content: 'Generate a completion summary.',
+            },
+          ],
+          taskContext,
+        }),
+      });
+
+      if (!response.ok) {
+        // Fail silently - skip completion message
+        setIsLoading(false);
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantMessage = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value);
+          assistantMessage += chunk;
+        }
+        
+        setMessages([{ role: 'assistant', content: assistantMessage }]);
+      }
+    } catch (error) {
+      console.error('Error sending completion message:', error);
+      // Fail silently
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const initiateCheckpoint = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/companion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'user',
+              content: 'I just completed a milestone. Ask me to explain what I built.',
+            },
+          ],
+          taskContext: {
+            ...taskContext,
+            checkpointMode: true,
+          },
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to get response');
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantMessage = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value);
+          assistantMessage += chunk;
+        }
+        
+        setMessages((prev) => [...prev, { role: 'assistant', content: assistantMessage }]);
+      }
+    } catch (error) {
+      console.error('Error initiating checkpoint:', error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Great work completing those tasks! Can you tell me in your own words what you built?',
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCheckpointResponse = async (explanation: string) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/tasks/checkpoint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          explanation,
+          conceptTags: taskContext.conceptTags,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to evaluate checkpoint');
+
+      const result = await response.json();
+      
+      // Add the AI's response to messages
+      setMessages((prev) => [...prev, { role: 'assistant', content: result.message }]);
+
+      // If passed, advance the checkpoint
+      if (result.pass) {
+        await fetch('/api/tasks/checkpoint/advance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enrollmentId }),
+        });
+        
+        // Notify parent to clear checkpoint and load next task
+        onCheckpointCleared();
+      }
+    } catch (error) {
+      console.error('Error handling checkpoint response:', error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Sorry, I encountered an error. Please try again.',
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const sendMessage = async (messageContent?: string, hintType?: string) => {
     const content = messageContent || input.trim();
     if (!content && !hintType) return;
@@ -108,6 +367,15 @@ export default function CompanionChat({ taskContext, onHintUsed, canUseHints, on
 
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
+    setLastUserMessage(content);
+    setApiError(false);
+
+    // If in checkpoint mode, handle checkpoint response
+    if (checkpointPending) {
+      await handleCheckpointResponse(content);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -122,7 +390,15 @@ export default function CompanionChat({ taskContext, onHintUsed, canUseHints, on
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to get response');
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (errorData.error === 'AI_UNAVAILABLE') {
+          setApiError(true);
+          setIsLoading(false);
+          return;
+        }
+        throw new Error('Failed to get response');
+      }
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
@@ -247,11 +523,35 @@ export default function CompanionChat({ taskContext, onHintUsed, canUseHints, on
             </div>
           </div>
         )}
+        {apiError && (
+          <div className="animate-fade-in">
+            <div className="flex items-start space-x-2">
+              <div className="w-7 h-7 bg-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg px-3 py-2">
+                <p className="text-sm text-slate-300 mb-2">Having a moment — try again.</p>
+                <button
+                  onClick={() => {
+                    setApiError(false);
+                    sendMessage(lastUserMessage);
+                  }}
+                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Hint Buttons Section */}
-      <div className="border-t border-[#3a3a3a] bg-[#1e1e1e] p-3">
+      {!checkpointPending && !stackCompleted && (
+        <div className="border-t border-[#3a3a3a] bg-[#1e1e1e] p-3">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Quick Hints</span>
           {!canUseHints && (
@@ -302,9 +602,23 @@ export default function CompanionChat({ taskContext, onHintUsed, canUseHints, on
           </button>
         </div>
       </div>
+      )}
 
       {/* Input Area */}
       <div className="border-t border-[#3a3a3a] bg-[#252526] p-4">
+        {checkpointPending && (
+          <div className="mb-3 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+            <div className="flex items-start space-x-2">
+              <svg className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm text-purple-300 font-medium">Milestone Reflection</p>
+                <p className="text-xs text-purple-400/80 mt-1">Share what you built to continue</p>
+              </div>
+            </div>
+          </div>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -316,7 +630,7 @@ export default function CompanionChat({ taskContext, onHintUsed, canUseHints, on
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask the AI companion for help..."
+            placeholder={checkpointPending ? "Explain what you built..." : "Ask the AI companion for help..."}
             disabled={isLoading}
             className="flex-1 px-3 py-2 bg-[#1a1a1a] border border-[#3a3a3a] rounded text-sm text-slate-300 placeholder-slate-500 focus:outline-none focus:border-purple-500 disabled:opacity-50"
           />

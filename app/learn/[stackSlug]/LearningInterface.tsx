@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import CompanionChat from './CompanionChat';
+import Navbar from '../../components/Navbar';
 
 type LearningInterfaceProps = {
   enrollmentId: string;
   stackName: string;
   stackSlug: string;
+  streakDays: number;
 };
 
 type TaskData = {
@@ -19,6 +21,7 @@ type TaskData = {
     status: string;
     messageCount: number;
     wasDetour: boolean;
+    editorState?: string | null;
   };
   task: {
     id: string;
@@ -32,12 +35,21 @@ type TaskData = {
   };
   storyLog: string[];
   detourTriggered?: boolean;
+  checkpointPending?: boolean;
+  companionMessages?: Array<{
+    role: string;
+    content: string;
+    createdAt: string;
+  }>;
+  isReturning?: boolean;
+  stackCompleted?: boolean;
 };
 
 export default function LearningInterface({
   enrollmentId,
   stackName,
   stackSlug,
+  streakDays,
 }: LearningInterfaceProps) {
   const [taskData, setTaskData] = useState<TaskData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +61,42 @@ export default function LearningInterface({
   const [code, setCode] = useState('// Your code will appear here\n// Start writing your solution\n\nfunction example() {\n  console.log(\'Hello, CodeSaga!\');\n}\n');
   const [taskDescription, setTaskDescription] = useState<string>('Loading task description...');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [checkpointPending, setCheckpointPending] = useState(false);
+  const [stackCompleted, setStackCompleted] = useState(false);
+  const [editorSaveTimeout, setEditorSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Auto-save editor state (debounced)
+  const saveEditorState = async (content: string, taskAttemptId: string) => {
+    try {
+      await fetch('/api/tasks/editor-state', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskAttemptId,
+          content,
+        }),
+      });
+    } catch (error) {
+      console.error('Error saving editor state:', error);
+      // Fail silently
+    }
+  };
+
+  const handleEditorChange = (value: string | undefined) => {
+    setCode(value || '');
+    
+    // Debounce save - wait 2 seconds after user stops typing
+    if (editorSaveTimeout) {
+      clearTimeout(editorSaveTimeout);
+    }
+    
+    if (taskData) {
+      const timeout = setTimeout(() => {
+        saveEditorState(value || '', taskData.taskAttempt.id);
+      }, 2000);
+      setEditorSaveTimeout(timeout);
+    }
+  };
 
   // Fetch current task
   useEffect(() => {
@@ -87,8 +135,24 @@ export default function LearningInterface({
         return;
       }
 
+      // Check for stack completion
+      if (data.stackCompleted) {
+        setStackCompleted(true);
+        setTaskData(data);
+        return;
+      }
+
       setTaskData(data);
       setHintsUsed(data.taskAttempt.hintsUsed);
+      setCheckpointPending(data.checkpointPending || false);
+      
+      // Restore editor state if it exists
+      if (data.taskAttempt.editorState) {
+        setCode(data.taskAttempt.editorState);
+      } else {
+        // Reset to default if no saved state
+        setCode('// Your code will appear here\n// Start writing your solution\n\nfunction example() {\n  console.log(\'Hello, CodeSaga!\');\n}\n');
+      }
     } catch (err) {
       console.error('Error fetching task:', err);
       setError('Failed to load task. Please refresh the page.');
@@ -117,6 +181,20 @@ export default function LearningInterface({
 
       const result = await response.json();
       console.log('Task completed:', result);
+
+      // Check for stack completion
+      if (result.stackCompleted) {
+        setStackCompleted(true);
+        await fetchCurrentTask();
+        return;
+      }
+
+      // Check if checkpoint is pending
+      if (result.checkpointPending) {
+        setCheckpointPending(true);
+        // Don't fetch next task yet - wait for checkpoint to be cleared
+        return;
+      }
 
       // Fetch next task
       await fetchCurrentTask();
@@ -151,6 +229,15 @@ export default function LearningInterface({
     } catch (err) {
       console.error('Error updating hints:', err);
     }
+  };
+
+  const handleCheckpointCleared = async () => {
+    setCheckpointPending(false);
+    // Fetch next task after checkpoint is cleared
+    await fetchCurrentTask();
+    // Reset state
+    setTimeOnTask(0);
+    setCanUseHints(false);
   };
 
   const formatTime = (seconds: number) => {
@@ -190,6 +277,66 @@ export default function LearningInterface({
     return null;
   }
 
+  // Stack completion state
+  if (stackCompleted) {
+    return (
+      <>
+        <Navbar streakDays={streakDays} />
+        <div className="h-screen flex flex-col bg-[#1a1a1a] pt-16">
+          <div className="flex-1 flex items-center justify-center p-8">
+          <div className="max-w-2xl w-full">
+            <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 border border-purple-500/30 rounded-2xl p-8">
+              <div className="text-center mb-8">
+                <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h1 className="text-3xl font-bold text-white mb-2">Stack Complete</h1>
+                <p className="text-purple-300">{stackName}</p>
+              </div>
+              
+              <div className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg p-6 mb-6">
+                <CompanionChat
+                  taskContext={{
+                    stackName,
+                    conceptTags: [],
+                    difficultyLevel: 'EASY',
+                    hintsUsed: 0,
+                    timeOnTask: '0:00',
+                    stackCompleted: true,
+                    storyLogEntries: taskData.storyLog,
+                  }}
+                  onHintUsed={() => {}}
+                  canUseHints={false}
+                  onTaskDescriptionReceived={() => {}}
+                  taskAttemptId=""
+                  checkpointPending={false}
+                  onCheckpointCleared={() => {}}
+                  enrollmentId={enrollmentId}
+                  stackCompleted={true}
+                />
+              </div>
+
+              <div className="text-center">
+                <a
+                  href="/dashboard"
+                  className="inline-flex items-center space-x-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
+                >
+                  <span>Choose another stack</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   const taskContext = {
     stackName,
     conceptTags: taskData.task.conceptTags,
@@ -200,7 +347,9 @@ export default function LearningInterface({
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#1a1a1a]">
+    <>
+      <Navbar streakDays={streakDays} />
+      <div className="h-screen flex flex-col bg-[#1a1a1a] pt-16">
       {/* Drawable Sidebar - Journey */}
       <div
         className={`fixed inset-y-0 left-0 z-50 w-80 bg-gradient-to-b from-[#1e1e2e] to-[#181825] border-r border-purple-500/30 transform transition-transform duration-300 ease-in-out ${
@@ -214,7 +363,12 @@ export default function LearningInterface({
               <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
-              <h2 className="text-lg font-semibold text-white">Your Journey</h2>
+              <div>
+                <h2 className="text-lg font-semibold text-white">Your Journey</h2>
+                {streakDays >= 2 && (
+                  <p className="text-xs text-purple-400">{streakDays}-day streak</p>
+                )}
+              </div>
             </div>
             <button
               onClick={() => setIsSidebarOpen(false)}
@@ -262,6 +416,19 @@ export default function LearningInterface({
                 <p className="text-slate-600 text-xs mt-2">Complete tasks to build your journey</p>
               </div>
             )}
+          </div>
+
+          {/* Sidebar Footer - Skill Map Link */}
+          <div className="border-t border-purple-500/30 p-4">
+            <a
+              href="/skills"
+              className="flex items-center justify-center space-x-2 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 hover:text-purple-200 rounded-lg transition-colors group"
+            >
+              <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <span className="text-sm font-medium">View your skill map</span>
+            </a>
           </div>
         </div>
       </div>
@@ -313,7 +480,7 @@ export default function LearningInterface({
         <div className="flex items-center space-x-2">
           <button
             onClick={handleComplete}
-            disabled={isCompleting}
+            disabled={isCompleting || checkpointPending}
             className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
           >
             {isCompleting ? (
@@ -386,7 +553,7 @@ export default function LearningInterface({
               height="100%"
               defaultLanguage="javascript"
               value={code}
-              onChange={(value) => setCode(value || '')}
+              onChange={handleEditorChange}
               theme="vs-dark"
               options={{
                 readOnly: false,
@@ -419,9 +586,15 @@ export default function LearningInterface({
             canUseHints={canUseHints}
             onTaskDescriptionReceived={setTaskDescription}
             taskAttemptId={taskData.taskAttempt.id}
+            checkpointPending={checkpointPending}
+            onCheckpointCleared={handleCheckpointCleared}
+            enrollmentId={enrollmentId}
+            companionMessages={taskData.companionMessages}
+            isReturning={taskData.isReturning}
           />
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

@@ -30,14 +30,14 @@ export async function POST(req: Request) {
     const taskAttempt = await prisma.taskAttempt.findUnique({
       where: { id: taskAttemptId },
       include: {
-        task: {
+        Task: {
           include: {
-            stack: true,
+            Stack: true,
           },
         },
-        session: {
+        Session: {
           include: {
-            enrollment: true,
+            Enrollment: true,
           },
         },
       },
@@ -68,8 +68,8 @@ export async function POST(req: Request) {
     console.log('Task attempt marked as completed');
 
     // Update concept progress for each concept tag
-    const conceptTags = taskAttempt.task.conceptTags;
-    const stackId = taskAttempt.task.stackId;
+    const conceptTags = taskAttempt.Task.conceptTags;
+    const stackId = taskAttempt.Task.stackId;
 
     for (const conceptTag of conceptTags) {
       // Calculate strength increase based on hints used
@@ -113,19 +113,60 @@ export async function POST(req: Request) {
 
     console.log('Concept progress updated');
 
+    // Check if milestone is complete and set checkpointPending
+    let checkpointPending = false;
+    if (!taskAttempt.Task.isDetour) {
+      const currentMilestoneGroup = taskAttempt.Task.milestoneGroup;
+      
+      // Get all non-detour tasks in this milestone group
+      const milestoneGroupTasks = await prisma.task.findMany({
+        where: {
+          stackId: stackId,
+          milestoneGroup: currentMilestoneGroup,
+          isDetour: false,
+        },
+        select: { id: true },
+      });
+
+      const milestoneTaskIds = milestoneGroupTasks.map(t => t.id);
+
+      // Check if all tasks in this milestone group are completed
+      const completedMilestoneTasks = await prisma.taskAttempt.findMany({
+        where: {
+          userId: user.id,
+          taskId: { in: milestoneTaskIds },
+          status: 'COMPLETED',
+        },
+        select: { taskId: true },
+      });
+
+      const completedTaskIds = new Set(completedMilestoneTasks.map(t => t.taskId));
+      const allMilestoneTasksComplete = milestoneTaskIds.every(id => completedTaskIds.has(id));
+
+      if (allMilestoneTasksComplete) {
+        // Set checkpointPending on the enrollment
+        await prisma.enrollment.update({
+          where: { id: taskAttempt.Session.Enrollment.id },
+          data: { checkpointPending: true },
+        });
+        checkpointPending = true;
+        console.log('Milestone complete - checkpoint pending');
+      }
+    }
+
     // Generate story log entry
     let storyEntry = 'Completed a task.';
     try {
       console.log('Generating story entry for task:', {
-        conceptTags: taskAttempt.task.conceptTags,
-        difficultyLevel: taskAttempt.task.difficultyLevel,
-        stackName: taskAttempt.task.stack.name,
+        conceptTags: taskAttempt.Task.conceptTags,
+        difficultyLevel: taskAttempt.Task.difficultyLevel,
+        stackName: taskAttempt.Task.Stack.name,
       });
       
       storyEntry = await generateStoryLogEntry({
-        conceptTags: taskAttempt.task.conceptTags,
-        difficultyLevel: taskAttempt.task.difficultyLevel,
-        stackName: taskAttempt.task.stack.name,
+        conceptTags: taskAttempt.Task.conceptTags,
+        difficultyLevel: taskAttempt.Task.difficultyLevel,
+        stackName: taskAttempt.Task.Stack.name,
       });
       
       console.log('Story entry generated successfully:', storyEntry);
@@ -137,7 +178,7 @@ export async function POST(req: Request) {
 
     // Update enrollment story log
     try {
-      const enrollment = taskAttempt.session.enrollment;
+      const enrollment = taskAttempt.Session.Enrollment;
       
       // Safely handle storyLog - it might be null, undefined, or a JSON string
       let currentLog: string[] = [];
@@ -175,10 +216,97 @@ export async function POST(req: Request) {
       // Don't fail the entire request if story log update fails
     }
 
+    // Update streak tracking
+    try {
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0); // Reset to start of day in UTC
+
+      const lastActive = user.lastActiveDate ? new Date(user.lastActiveDate) : null;
+      if (lastActive) {
+        lastActive.setUTCHours(0, 0, 0, 0);
+      }
+
+      let newStreakDays = user.streakDays || 0;
+
+      if (!lastActive || lastActive < today) {
+        // Calculate days difference
+        const daysDiff = lastActive 
+          ? Math.floor((today.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24))
+          : 999;
+
+        if (daysDiff === 1) {
+          // Yesterday - increment streak
+          newStreakDays += 1;
+        } else if (daysDiff > 1 || !lastActive) {
+          // More than 1 day ago or never active - reset streak
+          newStreakDays = 1;
+        }
+        // If daysDiff === 0, it's today - don't change streak
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            streakDays: newStreakDays,
+            lastActiveDate: today,
+          },
+        });
+
+        console.log('Streak updated:', { newStreakDays, lastActive, today });
+      }
+    } catch (error) {
+      console.error('Error updating streak:', error);
+      // Don't fail the request if streak update fails
+    }
+
+    // Check for stack completion
+    let stackCompleted = false;
+    if (!taskAttempt.Task.isDetour && !checkpointPending) {
+      try {
+        // Get all non-detour tasks in this stack
+        const allStackTasks = await prisma.task.findMany({
+          where: {
+            stackId: taskAttempt.Task.stackId,
+            isDetour: false,
+          },
+          select: { id: true },
+        });
+
+        const allTaskIds = allStackTasks.map(t => t.id);
+
+        // Check if all are completed
+        const completedStackTasks = await prisma.taskAttempt.findMany({
+          where: {
+            userId: user.id,
+            taskId: { in: allTaskIds },
+            status: 'COMPLETED',
+          },
+          select: { taskId: true },
+        });
+
+        const completedIds = new Set(completedStackTasks.map(t => t.taskId));
+        const allTasksComplete = allTaskIds.every(id => completedIds.has(id));
+
+        if (allTasksComplete) {
+          // Mark enrollment as completed
+          await prisma.enrollment.update({
+            where: { id: taskAttempt.Session.Enrollment.id },
+            data: { status: 'COMPLETED' },
+          });
+          stackCompleted = true;
+          console.log('Stack completed!');
+        }
+      } catch (error) {
+        console.error('Error checking stack completion:', error);
+        // Don't fail the request
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Task completed successfully',
       storyEntry,
+      checkpointPending,
+      stackCompleted,
     });
   } catch (error) {
     console.error('Error completing task:', error);

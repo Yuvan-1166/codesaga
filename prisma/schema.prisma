@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,79 +6,131 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id        String   @id @default(cuid())
-  clerkId   String   @unique
-  createdAt DateTime @default(now())
+model ConceptProgress {
+  id         String @id @default(cuid())
+  userId     String
+  stackId    String
+  conceptTag String
+  strength   Float  @default(0.0)
+  Stack      Stack  @relation(fields: [stackId], references: [id], onDelete: Cascade)
+  User       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  enrollments      Enrollment[]
-  taskAttempts     TaskAttempt[]
-  conceptProgress  ConceptProgress[]
-
-  @@index([clerkId])
-}
-
-model Stack {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  description String
-
-  enrollments     Enrollment[]
-  tasks           Task[]
-  conceptProgress ConceptProgress[]
-
-  @@index([slug])
+  @@unique([userId, stackId, conceptTag])
+  @@index([stackId])
+  @@index([userId])
 }
 
 model Enrollment {
-  id        String   @id @default(cuid())
-  userId    String
-  stackId   String
-  createdAt DateTime @default(now())
-  status    EnrollmentStatus @default(ACTIVE)
-  storyLog  Json     @default("[]")
-
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stack    Stack     @relation(fields: [stackId], references: [id], onDelete: Cascade)
-  sessions Session[]
+  id                String           @id @default(cuid())
+  userId            String
+  stackId           String
+  createdAt         DateTime         @default(now())
+  status            EnrollmentStatus @default(ACTIVE)
+  checkpointPending Boolean          @default(false)
+  storyLog          Json             @default("[]")
+  Stack             Stack            @relation(fields: [stackId], references: [id], onDelete: Cascade)
+  User              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Session           Session[]
 
   @@unique([userId, stackId])
-  @@index([userId])
   @@index([stackId])
-}
-
-enum EnrollmentStatus {
-  ACTIVE
-  COMPLETED
+  @@index([userId])
 }
 
 model Session {
-  id           String    @id @default(cuid())
+  id           String        @id @default(cuid())
   enrollmentId String
-  startedAt    DateTime  @default(now())
+  startedAt    DateTime      @default(now())
   completedAt  DateTime?
-
-  enrollment   Enrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
-  taskAttempts TaskAttempt[]
+  Enrollment   Enrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  TaskAttempt  TaskAttempt[]
 
   @@index([enrollmentId])
 }
 
-model Task {
-  id             String   @id @default(cuid())
-  stackId        String
-  internalOrder  Int
-  conceptTags    String[]
-  difficultyLevel DifficultyLevel
-  isDetour       Boolean  @default(false)
+model Stack {
+  id              String            @id @default(cuid())
+  name            String
+  slug            String            @unique
+  description     String
+  ConceptProgress ConceptProgress[]
+  Enrollment      Enrollment[]
+  Task            Task[]
 
-  stack        Stack         @relation(fields: [stackId], references: [id], onDelete: Cascade)
-  taskAttempts TaskAttempt[]
+  @@index([slug])
+}
+
+model Task {
+  id              String          @id @default(cuid())
+  stackId         String
+  internalOrder   Int
+  conceptTags     String[]
+  difficultyLevel DifficultyLevel
+  isDetour        Boolean         @default(false)
+  milestoneGroup  Int             @default(1)
+  testCases       Json?
+  starterCode     String?         @db.Text
+  language        String          @default("javascript")
+  executionMode   String          @default("browser")
+  Stack           Stack           @relation(fields: [stackId], references: [id], onDelete: Cascade)
+  TaskAttempt     TaskAttempt[]
 
   @@unique([stackId, internalOrder])
-  @@index([stackId])
   @@index([isDetour])
+  @@index([stackId])
+}
+
+model TaskAttempt {
+  id             String            @id @default(cuid())
+  taskId         String
+  sessionId      String
+  userId         String
+  startedAt      DateTime          @default(now())
+  completedAt    DateTime?
+  hintsUsed      Int               @default(0)
+  status         TaskAttemptStatus @default(IN_PROGRESS)
+  messageCount   Int               @default(0)
+  originalTaskId String?
+  wasDetour      Boolean           @default(false)
+  editorState    String?
+  codeSubmitted  String?           @db.Text
+  testResults    Json?
+  passedTests    Int               @default(0)
+  totalTests     Int               @default(0)
+  Session        Session           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  Task           Task              @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  User           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  CompanionMessage CompanionMessage[]
+
+  @@index([sessionId])
+  @@index([status])
+  @@index([taskId])
+  @@index([userId])
+}
+
+model CompanionMessage {
+  id            String       @id @default(cuid())
+  taskAttemptId String
+  role          String
+  content       String       @db.Text
+  createdAt     DateTime     @default(now())
+  TaskAttempt   TaskAttempt  @relation(fields: [taskAttemptId], references: [id], onDelete: Cascade)
+
+  @@index([taskAttemptId])
+  @@index([createdAt])
+}
+
+model User {
+  id             String            @id @default(cuid())
+  clerkId        String            @unique
+  createdAt      DateTime          @default(now())
+  streakDays     Int               @default(0)
+  lastActiveDate DateTime?
+  ConceptProgress ConceptProgress[]
+  Enrollment      Enrollment[]
+  TaskAttempt     TaskAttempt[]
+
+  @@index([clerkId])
 }
 
 enum DifficultyLevel {
@@ -90,46 +139,13 @@ enum DifficultyLevel {
   HARD
 }
 
-model TaskAttempt {
-  id          String    @id @default(cuid())
-  taskId      String
-  sessionId   String
-  userId      String
-  startedAt   DateTime  @default(now())
-  completedAt DateTime?
-  hintsUsed   Int       @default(0)
-  status      TaskAttemptStatus @default(IN_PROGRESS)
-  messageCount Int      @default(0)
-  wasDetour   Boolean   @default(false)
-  originalTaskId String?
-
-  task    Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([taskId])
-  @@index([sessionId])
-  @@index([userId])
-  @@index([status])
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
 }
 
 enum TaskAttemptStatus {
   IN_PROGRESS
   COMPLETED
   SKIPPED
-}
-
-model ConceptProgress {
-  id         String  @id @default(cuid())
-  userId     String
-  stackId    String
-  conceptTag String
-  strength   Float   @default(0.0)
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stack Stack @relation(fields: [stackId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, stackId, conceptTag])
-  @@index([userId])
-  @@index([stackId])
 }

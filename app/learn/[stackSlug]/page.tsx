@@ -54,6 +54,7 @@ export default async function LearnPage({ params }: PageProps) {
       enrollmentId={enrollment.id}
       stackName={stack.name}
       stackSlug={stack.slug}
+      streakDays={dbUser.streakDays}
     />
   );
 }

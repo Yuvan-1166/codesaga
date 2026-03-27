@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { detectStruggle, findDetourTask } from '@/lib/detour-system';
+import type { Prisma } from '@prisma/client';
 
 export async function GET(req: Request) {
   try {
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
         status: 'ACTIVE',
       },
       include: {
-        stack: true,
+        Stack: true,
       },
     });
 
@@ -65,14 +66,18 @@ export async function GET(req: Request) {
     }
 
     // Find current active task attempt
-    let taskAttempt = await prisma.taskAttempt.findFirst({
+    type TaskAttemptWithTask = Prisma.TaskAttemptGetPayload<{
+      include: { Task: true }
+    }>;
+    
+    let taskAttempt: TaskAttemptWithTask | null = await prisma.taskAttempt.findFirst({
       where: {
         userId: user.id,
         sessionId: session.id,
         status: 'IN_PROGRESS',
       },
       include: {
-        task: true,
+        Task: true,
       },
       orderBy: {
         startedAt: 'desc',
@@ -82,7 +87,7 @@ export async function GET(req: Request) {
     let detourTriggered = false;
 
     // Check for struggle and trigger detour if needed
-    if (taskAttempt && !taskAttempt.task.isDetour) {
+    if (taskAttempt && !taskAttempt.Task.isDetour) {
       const isStruggling = await detectStruggle(taskAttempt.id);
       
       if (isStruggling) {
@@ -90,7 +95,7 @@ export async function GET(req: Request) {
         const detourTask = await findDetourTask(
           user.id,
           enrollment.stackId,
-          taskAttempt.task.conceptTags
+          taskAttempt.Task.conceptTags
         );
 
         if (detourTask) {
@@ -101,7 +106,7 @@ export async function GET(req: Request) {
           });
 
           // Create new task attempt for the detour
-          taskAttempt = await prisma.taskAttempt.create({
+          taskAttempt = (await prisma.taskAttempt.create({
             data: {
               taskId: detourTask.id,
               sessionId: session.id,
@@ -112,9 +117,9 @@ export async function GET(req: Request) {
               originalTaskId: taskAttempt.taskId,
             },
             include: {
-              task: true,
+              Task: true,
             },
-          });
+          })) as TaskAttemptWithTask;
 
           detourTriggered = true;
         }
@@ -131,7 +136,7 @@ export async function GET(req: Request) {
           status: 'SKIPPED',
         },
         include: {
-          task: true,
+          Task: true,
         },
         orderBy: {
           startedAt: 'desc',
@@ -149,7 +154,7 @@ export async function GET(req: Request) {
             messageCount: 0, // Reset messages
           },
           include: {
-            task: true,
+            Task: true,
           },
         });
       } else {
@@ -157,7 +162,7 @@ export async function GET(req: Request) {
         const completedTaskIds = await prisma.taskAttempt.findMany({
           where: {
             userId: user.id,
-            task: {
+            Task: {
               stackId: enrollment.stackId,
             },
             status: 'COMPLETED',
@@ -200,7 +205,7 @@ export async function GET(req: Request) {
             startedAt: new Date(),
           },
           include: {
-            task: true,
+            Task: true,
           },
         });
       }
@@ -208,6 +213,33 @@ export async function GET(req: Request) {
 
     // Get story log
     const storyLog = (enrollment.storyLog as string[]) || [];
+
+    // Check if stack is completed
+    if (enrollment.status === 'COMPLETED') {
+      return NextResponse.json({
+        stackCompleted: true,
+        storyLog,
+      });
+    }
+
+    // Get companion messages for this task attempt (last 20)
+    const companionMessages = await prisma.companionMessage.findMany({
+      where: {
+        taskAttemptId: taskAttempt.id,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+      take: 20,
+      select: {
+        role: true,
+        content: true,
+        createdAt: true,
+      },
+    });
+
+    // Check if user is returning (has messages already)
+    const isReturning = companionMessages.length > 0;
 
     return NextResponse.json({
       taskAttempt: {
@@ -218,19 +250,23 @@ export async function GET(req: Request) {
         status: taskAttempt.status,
         messageCount: taskAttempt.messageCount,
         wasDetour: taskAttempt.wasDetour,
+        editorState: taskAttempt.editorState,
       },
       task: {
-        id: taskAttempt.task.id,
-        conceptTags: taskAttempt.task.conceptTags,
-        difficultyLevel: taskAttempt.task.difficultyLevel,
-        isDetour: taskAttempt.task.isDetour,
+        id: taskAttempt.Task.id,
+        conceptTags: taskAttempt.Task.conceptTags,
+        difficultyLevel: taskAttempt.Task.difficultyLevel,
+        isDetour: taskAttempt.Task.isDetour,
       },
       stack: {
-        name: enrollment.stack.name,
-        slug: enrollment.stack.slug,
+        name: enrollment.Stack.name,
+        slug: enrollment.Stack.slug,
       },
       storyLog: storyLog.slice(-4), // Last 4 entries
       detourTriggered,
+      checkpointPending: enrollment.checkpointPending,
+      companionMessages,
+      isReturning,
     });
   } catch (error) {
     console.error('Error fetching current task:', error);
