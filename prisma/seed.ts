@@ -2,8 +2,6 @@ import 'dotenv/config'; // Load environment variables
 import { PrismaClient, DifficultyLevel } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
-import { readFileSync, existsSync } from 'fs';
-import { join, resolve } from 'path';
 
 // Debug: Check if DATABASE_URL is loaded
 if (!process.env.DATABASE_URL) {
@@ -13,24 +11,13 @@ if (!process.env.DATABASE_URL) {
 
 console.log('DATABASE_URL loaded:', process.env.DATABASE_URL.substring(0, 30) + '...');
 
-// Find the CA certificate - try multiple paths
-let ca: string | undefined;
-const possiblePaths = [
-  join(process.cwd(), 'ca.pem'),
-  join(__dirname, '..', 'ca.pem'),
-  resolve(process.cwd(), 'ca.pem'),
-];
-
-for (const path of possiblePaths) {
-  if (existsSync(path)) {
-    ca = readFileSync(path).toString();
-    console.log(`Using CA certificate from: ${path}`);
-    break;
-  }
-}
+// Get CA certificate from environment variable
+const ca = process.env.DATABASE_CA?.replace(/\\n/g, '\n');
 
 if (!ca) {
-  console.warn('Warning: ca.pem not found, SSL verification may fail');
+  console.warn('Warning: DATABASE_CA not set, SSL verification may fail');
+} else {
+  console.log('Using CA certificate from DATABASE_CA environment variable');
 }
 
 // Create a PostgreSQL connection pool with proper SSL configuration
@@ -40,7 +27,7 @@ const pool = new Pool({
     ca,
     rejectUnauthorized: true,
   } : {
-    rejectUnauthorized: false, // Fallback if ca.pem not found
+    rejectUnauthorized: false, // Fallback if CA not provided
   },
 });
 

@@ -1,23 +1,23 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
   pool: Pool | undefined;
 };
 
-// Read the CA certificate for Aiven
-const ca = readFileSync(join(process.cwd(), 'ca.pem')).toString();
+// Get CA certificate from environment variable
+const ca = process.env.DATABASE_CA?.replace(/\\n/g, '\n');
 
 // Create a PostgreSQL connection pool with proper SSL configuration
 const pool = globalForPrisma.pool ?? new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    ca, // Use the CA certificate
+  ssl: ca ? {
+    ca, // Use the CA certificate from env
     rejectUnauthorized: true, // Verify the certificate
+  } : {
+    rejectUnauthorized: false, // Fallback if CA not provided
   },
 });
 
