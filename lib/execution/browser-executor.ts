@@ -129,11 +129,30 @@ export async function runBrowserTests(
                          typeof solution === 'function' ? solution(${args}) :
                          typeof solve === 'function' ? solve(${args}) :
                          typeof filterEven === 'function' ? filterEven(${args}) :
+                         typeof add === 'function' ? add(${args}) :
+                         typeof multiply === 'function' ? multiply(${args}) :
+                         typeof calculate === 'function' ? calculate(${args}) :
+                         undefined;
+          result;
+        `;
+      } else if (Array.isArray(testCase.input)) {
+        // For array inputs, pass as single argument
+        testCode = `
+          ${code}
+          
+          // Run test
+          const input = ${JSON.stringify(testCase.input)};
+          const result = typeof filterEven === 'function' ? filterEven(input) :
+                         typeof main === 'function' ? main(input) : 
+                         typeof solution === 'function' ? solution(input) :
+                         typeof solve === 'function' ? solve(input) :
+                         typeof process === 'function' ? process(input) :
+                         typeof transform === 'function' ? transform(input) :
                          undefined;
           result;
         `;
       } else {
-        // For array or primitive inputs
+        // For primitive inputs
         testCode = `
           ${code}
           
@@ -142,7 +161,7 @@ export async function runBrowserTests(
           const result = typeof main === 'function' ? main(input) : 
                          typeof solution === 'function' ? solution(input) :
                          typeof solve === 'function' ? solve(input) :
-                         typeof filterEven === 'function' ? filterEven(input) :
+                         typeof process === 'function' ? process(input) :
                          undefined;
           result;
         `;

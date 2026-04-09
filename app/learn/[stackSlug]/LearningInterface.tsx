@@ -26,12 +26,16 @@ type TaskData = {
     messageCount: number;
     wasDetour: boolean;
     editorState?: string | null;
+    testResults?: any;
+    passedTests?: number;
+    totalTests?: number;
   };
   task: {
     id: string;
     conceptTags: string[];
     difficultyLevel: string;
     isDetour: boolean;
+    executionMode?: string;
   };
   stack: {
     name: string;
@@ -47,6 +51,8 @@ type TaskData = {
   }>;
   isReturning?: boolean;
   stackCompleted?: boolean;
+  testCases?: TestCase[];
+  starterCode?: string;
 };
 
 export default function LearningInterface({
@@ -197,24 +203,57 @@ export default function LearningInterface({
   };
 
   const handleRunCode = async () => {
+    if (!taskData) return;
+
     setIsRunningCode(true);
     setConsoleOutput([]);
     setActiveTab('console');
 
     try {
-      // Execute in browser
-      const result = await executeBrowserCode(code, 5000);
-      
-      if (result.success) {
-        setConsoleOutput([
-          ...result.consoleOutput,
-          result.output !== undefined ? `=> ${JSON.stringify(result.output)}` : '',
-        ].filter(Boolean));
+      // Check execution mode from task
+      const executionMode = taskData.task.executionMode || 'browser';
+
+      if (executionMode === 'server') {
+        // Execute on server
+        const response = await fetch('/api/tasks/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            taskAttemptId: taskData.taskAttempt.id,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.mode === 'server') {
+          if (result.success) {
+            setConsoleOutput([
+              ...result.consoleOutput,
+              result.output !== undefined ? `=> ${JSON.stringify(result.output)}` : '',
+            ].filter(Boolean));
+          } else {
+            setConsoleOutput([
+              ...result.consoleOutput,
+              `ERROR: ${result.error}`,
+            ]);
+          }
+        }
       } else {
-        setConsoleOutput([
-          ...result.consoleOutput,
-          `ERROR: ${result.error}`,
-        ]);
+        // Execute in browser
+        const result = await executeBrowserCode(code, 5000);
+        
+        if (result.success) {
+          setConsoleOutput([
+            ...result.consoleOutput,
+            result.output !== undefined ? `=> ${JSON.stringify(result.output)}` : '',
+          ].filter(Boolean));
+        } else {
+          setConsoleOutput([
+            ...result.consoleOutput,
+            `ERROR: ${result.error}`,
+          ]);
+        }
       }
     } catch (error) {
       setConsoleOutput([`ERROR: ${error instanceof Error ? error.message : String(error)}`]);
@@ -230,22 +269,45 @@ export default function LearningInterface({
     setActiveTab('tests');
 
     try {
-      // Run tests in browser
-      const result = await runBrowserTests(code, testCases);
-      
-      setTestResults(result.results);
-      setTestsPassed(result.passed);
-      setTestsTotal(result.total);
+      // Check execution mode from task
+      const executionMode = taskData.task.executionMode || 'browser';
 
-      // Update task attempt with results
-      await fetch('/api/tasks/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code,
-          taskAttemptId: taskData.taskAttempt.id,
-        }),
-      });
+      if (executionMode === 'server') {
+        // Run tests on server
+        const response = await fetch('/api/tasks/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            taskAttemptId: taskData.taskAttempt.id,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.mode === 'server') {
+          setTestResults(result.results);
+          setTestsPassed(result.passed);
+          setTestsTotal(result.total);
+        }
+      } else {
+        // Run tests in browser
+        const result = await runBrowserTests(code, testCases);
+        
+        setTestResults(result.results);
+        setTestsPassed(result.passed);
+        setTestsTotal(result.total);
+
+        // Update task attempt with results
+        await fetch('/api/tasks/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            taskAttemptId: taskData.taskAttempt.id,
+          }),
+        });
+      }
     } catch (error) {
       console.error('Error running tests:', error);
       setConsoleOutput([`ERROR: ${error instanceof Error ? error.message : String(error)}`]);

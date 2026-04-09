@@ -260,6 +260,7 @@ export async function GET(req: Request) {
         conceptTags: taskAttempt.Task.conceptTags,
         difficultyLevel: taskAttempt.Task.difficultyLevel,
         isDetour: taskAttempt.Task.isDetour,
+        executionMode: taskAttempt.Task.executionMode,
       },
       stack: {
         name: enrollment.Stack.name,
