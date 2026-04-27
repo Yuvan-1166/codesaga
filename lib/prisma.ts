@@ -7,26 +7,27 @@ const globalForPrisma = globalThis as unknown as {
   pool: Pool | undefined;
 };
 
-// Get CA certificate from environment variable
-const ca = process.env.DATABASE_CA?.replace(/\\n/g, '\n');
+// Create a PostgreSQL connection pool with SSL but without certificate verification
+// This is needed for managed databases like Aiven that use self-signed certificates
+if (!globalForPrisma.pool) {
+  // Remove sslmode from connection string and set SSL config explicitly
+  const connectionString = process.env.DATABASE_URL?.replace(/[?&]sslmode=[^&]*/g, '');
+  
+  globalForPrisma.pool = new Pool({
+    connectionString,
+    ssl: {
+      rejectUnauthorized: false, // Accept self-signed certificates
+    },
+  });
+}
 
-// Create a PostgreSQL connection pool with proper SSL configuration
-const pool = globalForPrisma.pool ?? new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: ca ? {
-    ca, // Use the CA certificate from env
-    rejectUnauthorized: true, // Verify the certificate
-  } : {
-    rejectUnauthorized: false, // Fallback if CA not provided
-  },
-});
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.pool = pool;
-
-// Create Prisma adapter with type assertion to handle version mismatch
-const adapter = new PrismaPg(pool as any);
+const pool = globalForPrisma.pool;
 
 // Initialize Prisma Client with the adapter
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
+if (!globalForPrisma.prisma) {
+  // Create Prisma adapter with type assertion to handle version mismatch
+  const adapter = new PrismaPg(pool as any);
+  globalForPrisma.prisma = new PrismaClient({ adapter });
+}
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+export const prisma = globalForPrisma.prisma;

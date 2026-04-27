@@ -11,23 +11,14 @@ if (!process.env.DATABASE_URL) {
 
 console.log('DATABASE_URL loaded:', process.env.DATABASE_URL.substring(0, 30) + '...');
 
-// Get CA certificate from environment variable
-const ca = process.env.DATABASE_CA?.replace(/\\n/g, '\n');
+// Remove sslmode from connection string and set SSL config explicitly
+const connectionString = process.env.DATABASE_URL?.replace(/[?&]sslmode=[^&]*/g, '');
 
-if (!ca) {
-  console.warn('Warning: DATABASE_CA not set, SSL verification may fail');
-} else {
-  console.log('Using CA certificate from DATABASE_CA environment variable');
-}
-
-// Create a PostgreSQL connection pool with proper SSL configuration
+// Create a PostgreSQL connection pool with SSL but without certificate verification
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: ca ? {
-    ca,
-    rejectUnauthorized: true,
-  } : {
-    rejectUnauthorized: false, // Fallback if CA not provided
+  connectionString,
+  ssl: {
+    rejectUnauthorized: false, // Accept self-signed certificates
   },
 });
 
