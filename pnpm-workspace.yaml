@@ -1,3 +1,7 @@
+packages:
+  - "."
+  - "server"
+
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
