@@ -22,8 +22,8 @@ export const CONFIG = {
   docker: {
     socketPath: process.env.DOCKER_SOCKET || '/var/run/docker.sock',
     images: {
-      javascript: 'codesaga-node:latest',
-      python: 'codesaga-python:latest',
+      javascript: process.env.NODE_IMAGE || 'codesaga-node:latest',
+      python: process.env.PYTHON_IMAGE || 'codesaga-python:latest',
     },
   },
 };

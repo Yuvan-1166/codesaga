@@ -215,6 +215,8 @@ export default function LearningInterface({
 
       if (executionMode === 'server') {
         // Execute on server
+        setConsoleOutput(['🚀 Executing on server...']);
+        
         const response = await fetch('/api/tasks/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -229,11 +231,15 @@ export default function LearningInterface({
         if (result.mode === 'server') {
           if (result.success) {
             setConsoleOutput([
+              `✅ Executed on server (${result.executionTime}ms)`,
+              '─────────────────────────────',
               ...result.consoleOutput,
               result.output !== undefined ? `=> ${JSON.stringify(result.output)}` : '',
             ].filter(Boolean));
           } else {
             setConsoleOutput([
+              `❌ Server execution failed (${result.executionTime}ms)`,
+              '─────────────────────────────',
               ...result.consoleOutput,
               `ERROR: ${result.error}`,
             ]);
@@ -241,15 +247,21 @@ export default function LearningInterface({
         }
       } else {
         // Execute in browser
+        setConsoleOutput(['🌐 Executing in browser...']);
+        
         const result = await executeBrowserCode(code, 5000);
         
         if (result.success) {
           setConsoleOutput([
+            `✅ Executed in browser (${result.executionTime}ms)`,
+            '─────────────────────────────',
             ...result.consoleOutput,
             result.output !== undefined ? `=> ${JSON.stringify(result.output)}` : '',
           ].filter(Boolean));
         } else {
           setConsoleOutput([
+            `❌ Browser execution failed (${result.executionTime}ms)`,
+            '─────────────────────────────',
             ...result.consoleOutput,
             `ERROR: ${result.error}`,
           ]);
@@ -274,6 +286,8 @@ export default function LearningInterface({
 
       if (executionMode === 'server') {
         // Run tests on server
+        setConsoleOutput(['🚀 Running tests on server...']);
+        
         const response = await fetch('/api/tasks/test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -289,9 +303,17 @@ export default function LearningInterface({
           setTestResults(result.results);
           setTestsPassed(result.passed);
           setTestsTotal(result.total);
+          
+          // Add server execution indicator to console
+          setConsoleOutput([
+            `✅ Tests executed on server`,
+            `Passed: ${result.passed}/${result.total}`,
+          ]);
         }
       } else {
         // Run tests in browser
+        setConsoleOutput(['🌐 Running tests in browser...']);
+        
         const result = await runBrowserTests(code, testCases);
         
         setTestResults(result.results);
@@ -307,6 +329,11 @@ export default function LearningInterface({
             taskAttemptId: taskData.taskAttempt.id,
           }),
         });
+        
+        setConsoleOutput([
+          `✅ Tests executed in browser`,
+          `Passed: ${result.passed}/${result.total}`,
+        ]);
       }
     } catch (error) {
       console.error('Error running tests:', error);
@@ -669,6 +696,28 @@ export default function LearningInterface({
               'bg-red-500/20 text-red-400'
             }`}>
               {taskData.task.difficultyLevel}
+            </span>
+            <span className="text-slate-400">•</span>
+            <span className={`px-2 py-1 rounded flex items-center space-x-1 ${
+              taskData.task.executionMode === 'server' 
+                ? 'bg-blue-500/20 text-blue-400' 
+                : 'bg-purple-500/20 text-purple-400'
+            }`}>
+              {taskData.task.executionMode === 'server' ? (
+                <>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                  </svg>
+                  <span>Server</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                  </svg>
+                  <span>Browser</span>
+                </>
+              )}
             </span>
             <span className="text-slate-400">•</span>
             <span className="text-slate-400">{formatTime(timeOnTask)}</span>

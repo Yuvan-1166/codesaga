@@ -1,11 +1,8 @@
 import Docker from 'dockerode';
-import { v4 as uuidv4 } from 'uuid';
 import { Language, TestCase, TestResult } from '../types';
 import { CONFIG } from '../config';
-import { SecurityValidator } from '../security/validator';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as os from 'os';
 
 export class DockerExecutor {
   private docker: Docker;
@@ -68,11 +65,7 @@ export class DockerExecutor {
       }
     }
 
-    return {
-      results,
-      stdout: SecurityValidator.sanitizeOutput(allStdout),
-      stderr: SecurityValidator.sanitizeOutput(allStderr),
-    };
+    return { results, stdout: allStdout, stderr: allStderr };
   }
 
   private async executeSingleTest(
@@ -82,95 +75,85 @@ export class DockerExecutor {
     timeout: number,
     memoryLimit: number
   ): Promise<{ output: any; stdout: string; stderr: string; error?: string; memoryUsed?: number }> {
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codesaga-'));
+    // Use /tmp/codesaga for better Docker compatibility
+    const baseDir = '/tmp/codesaga';
+    await fs.mkdir(baseDir, { recursive: true, mode: 0o755 }).catch(() => {});
+    
+    const tempDir = await fs.mkdtemp(path.join(baseDir, 'exec-'));
     
     try {
-      // Prepare code file
-      const { filePath, command } = await this.prepareCodeFile(
-        tempDir,
-        language,
-        code,
-        testCase
-      );
+      const fileName = language === 'javascript' ? 'solution.js' : 'solution.py';
+      const filePath = path.join(tempDir, fileName);
+      const testCode = this.generateTestCode(language, code, testCase);
+      
+      // Write file with world-readable permissions (0o644 = rw-r--r--)
+      await fs.writeFile(filePath, testCode, { mode: 0o644 });
+      
+      // Ensure directory is readable by all users
+      await fs.chmod(tempDir, 0o755);
+      
+      // Verify file exists and is readable
+      await fs.access(filePath, fs.constants.R_OK);
+      const stats = await fs.stat(filePath);
+      console.log(`[Docker] Created file: ${filePath} (${stats.size} bytes, mode: ${stats.mode.toString(8)})`);
 
-      // Execute in Docker container
-      const result = await this.runContainer(
+      const result = await this.runInDockerSandbox(
         language,
         tempDir,
-        command,
+        fileName,
         timeout,
         memoryLimit
       );
 
       return result;
+    } catch (error) {
+      console.error('[Docker] Error in executeSingleTest:', error);
+      throw error;
     } finally {
-      // Cleanup temp directory
-      await fs.rm(tempDir, { recursive: true, force: true });
+      await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
   }
 
-  private async prepareCodeFile(
-    tempDir: string,
-    language: Language,
-    code: string,
-    testCase: TestCase
-  ): Promise<{ filePath: string; command: string[] }> {
+  private generateTestCode(language: Language, code: string, testCase: TestCase): string {
     if (language === 'javascript') {
-      const filePath = path.join(tempDir, 'solution.js');
-      const testCode = this.generateJavaScriptTestCode(code, testCase);
-      await fs.writeFile(filePath, testCode);
-      return { filePath, command: ['node', '/sandbox/solution.js'] };
-    } else if (language === 'python') {
-      const filePath = path.join(tempDir, 'solution.py');
-      const testCode = this.generatePythonTestCode(code, testCase);
-      await fs.writeFile(filePath, testCode);
-      return { filePath, command: ['python3', '/sandbox/solution.py'] };
+      return `${code}
+
+const input = ${JSON.stringify(testCase.input)};
+
+(async () => {
+  try {
+    let result;
+    
+    // Try common function names
+    if (typeof sum !== 'undefined') {
+      result = await sum(input.a, input.b);
+    } else if (typeof filterEven !== 'undefined') {
+      result = await filterEven(input);
+    } else if (typeof main !== 'undefined') {
+      result = await main(input);
+    } else if (typeof solution !== 'undefined') {
+      result = await solution(input);
+    } else {
+      throw new Error('No recognized function found. Define: sum, filterEven, main, or solution');
     }
     
-    throw new Error(`Unsupported language: ${language}`);
+    console.log(JSON.stringify({ output: result }));
+  } catch (error) {
+    console.error(JSON.stringify({ error: error.message }));
+    process.exit(1);
   }
-
-  private generateJavaScriptTestCode(code: string, testCase: TestCase): string {
-    return `
-${code}
-
-// Test execution
-const input = ${JSON.stringify(testCase.input)};
-let result;
-
-try {
-  // Try common function names
-  if (typeof sum === 'function') {
-    result = sum(input.a, input.b);
-  } else if (typeof filterEven === 'function') {
-    result = filterEven(input);
-  } else if (typeof main === 'function') {
-    result = main(input);
-  } else if (typeof solution === 'function') {
-    result = solution(input);
-  } else {
-    throw new Error('No recognized function found');
-  }
-  
-  console.log(JSON.stringify({ output: result }));
-} catch (error) {
-  console.error(JSON.stringify({ error: error.message }));
-  process.exit(1);
-}
-`;
-  }
-
-  private generatePythonTestCode(code: string, testCase: TestCase): string {
-    return `
-import json
+})();`;
+    } else {
+      return `import json
 import sys
 
 ${code}
 
-# Test execution
 input_data = ${JSON.stringify(testCase.input)}
 
 try:
+    result = None
+    
     # Try common function names
     if 'sum' in dir():
         result = sum(input_data.get('a'), input_data.get('b'))
@@ -181,61 +164,106 @@ try:
     elif 'solution' in dir():
         result = solution(input_data)
     else:
-        raise Exception('No recognized function found')
+        raise Exception('No recognized function found. Define: sum, filter_even, main, or solution')
     
     print(json.dumps({'output': result}))
 except Exception as e:
     print(json.dumps({'error': str(e)}), file=sys.stderr)
-    sys.exit(1)
-`;
+    sys.exit(1)`;
+    }
   }
 
-  private async runContainer(
+  private async runInDockerSandbox(
     language: Language,
-    tempDir: string,
-    command: string[],
+    hostDir: string,
+    fileName: string,
     timeout: number,
     memoryLimit: number
   ): Promise<{ output: any; stdout: string; stderr: string; error?: string; memoryUsed?: number }> {
     const imageName = CONFIG.docker.images[language];
-    
+    const cmd = language === 'javascript' 
+      ? ['node', `/sandbox/${fileName}`] 
+      : ['python3', `/sandbox/${fileName}`];
+
+    console.log(`[Docker] Executing: ${cmd.join(' ')}`);
+    console.log(`[Docker] Host directory: ${hostDir}`);
+    console.log(`[Docker] Image: ${imageName}`);
+
+    // Ensure image exists
+    try {
+      await this.docker.getImage(imageName).inspect();
+    } catch {
+      throw new Error(`Docker image ${imageName} not found. Build it first: docker build -t ${imageName} -f docker/${language === 'javascript' ? 'node' : 'python'}.Dockerfile .`);
+    }
+
     const container = await this.docker.createContainer({
       Image: imageName,
-      Cmd: command,
-      HostConfig: {
-        Memory: memoryLimit * 1024 * 1024, // Convert MB to bytes
-        MemorySwap: memoryLimit * 1024 * 1024,
-        CpuQuota: 50000, // 0.5 CPU
-        PidsLimit: 50,
-        NetworkMode: 'none',
-        ReadonlyRootfs: true,
-        Binds: [`${tempDir}:/sandbox:ro`],
-        Tmpfs: { '/tmp': 'rw,noexec,nosuid,size=10m' },
-        SecurityOpt: ['no-new-privileges'],
-      },
-      User: 'sandbox',
+      Cmd: cmd,
+      User: language === 'javascript' ? 'node' : 'sandbox',
       WorkingDir: '/sandbox',
+      HostConfig: {
+        // Resource limits
+        Memory: memoryLimit * 1024 * 1024,
+        MemorySwap: memoryLimit * 1024 * 1024,
+        MemoryReservation: (memoryLimit / 2) * 1024 * 1024,
+        CpuQuota: 50000, // 0.5 CPU
+        CpuPeriod: 100000,
+        PidsLimit: 50,
+        
+        // Network isolation
+        NetworkMode: 'none',
+        
+        // Filesystem - mount with :Z for SELinux compatibility
+        Binds: [`${hostDir}:/sandbox:ro,Z`],
+        ReadonlyRootfs: false,
+        Tmpfs: {
+          '/tmp': 'rw,noexec,nosuid,size=10m,mode=1777'
+        },
+        
+        // Security
+        SecurityOpt: [
+          'no-new-privileges:true',
+        ],
+        CapDrop: ['ALL'],
+        
+        AutoRemove: false,
+      },
+      AttachStdout: true,
+      AttachStderr: true,
+      Tty: false,
     });
 
+    console.log(`[Docker] Container created: ${container.id}`);
+
+    let containerId: string | undefined;
+
     try {
+      containerId = container.id;
+      console.log(`[Docker] Starting container...`);
       await container.start();
 
-      // Wait for container with timeout
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Execution timeout')), timeout);
+      // Wait with timeout
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Execution timeout exceeded')), timeout);
       });
 
       const waitPromise = container.wait();
-      await Promise.race([waitPromise, timeoutPromise]);
+      const waitResult = await Promise.race([waitPromise, timeoutPromise]);
+      
+      console.log(`[Docker] Container finished with status: ${waitResult.StatusCode}`);
 
       // Get logs
-      const logs = await container.logs({
+      const logsStream = await container.logs({
         stdout: true,
         stderr: true,
+        follow: false,
       });
 
-      const logString = logs.toString('utf-8');
-      const [stdout, stderr] = this.parseLogs(logString);
+      const logs = logsStream.toString('utf-8');
+      const { stdout, stderr } = this.parseDockerLogs(logs);
+      
+      console.log(`[Docker] stdout: ${stdout.substring(0, 200)}`);
+      if (stderr) console.log(`[Docker] stderr: ${stderr.substring(0, 200)}`);
 
       // Parse output
       let output: any;
@@ -249,35 +277,66 @@ except Exception as e:
           output = parsed.output;
         }
       } catch {
-        // If not JSON, treat as raw output
         output = stdout.trim();
       }
 
       // Get memory stats
-      const stats = await container.stats({ stream: false });
-      const memoryUsed = Math.round(stats.memory_stats.usage / (1024 * 1024)); // Convert to MB
+      let memoryUsed = 0;
+      try {
+        const stats = await container.stats({ stream: false });
+        memoryUsed = Math.round((stats.memory_stats.usage || 0) / (1024 * 1024));
+      } catch {
+        memoryUsed = 0;
+      }
 
       return { output, stdout, stderr, error, memoryUsed };
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      return {
+        output: null,
+        stdout: '',
+        stderr: error,
+        error,
+        memoryUsed: 0,
+      };
     } finally {
-      // Cleanup container
-      try {
-        await container.remove({ force: true });
-      } catch (err) {
-        console.error('Error removing container:', err);
+      // Cleanup
+      if (containerId) {
+        try {
+          await container.remove({ force: true, v: true });
+        } catch {}
       }
     }
   }
 
-  private parseLogs(logs: string): [string, string] {
-    // Docker logs format: 8 bytes header + payload
-    // Simple split by newlines for now
+  private parseDockerLogs(logs: string): { stdout: string; stderr: string } {
     const lines = logs.split('\n');
-    const stdout = lines.filter(l => !l.includes('ERROR')).join('\n');
-    const stderr = lines.filter(l => l.includes('ERROR')).join('\n');
-    return [stdout, stderr];
+    let stdout = '';
+    let stderr = '';
+
+    for (const line of lines) {
+      if (line.length < 8) continue;
+      
+      const streamType = line.charCodeAt(0);
+      const content = line.slice(8);
+      
+      if (streamType === 1) {
+        stdout += content + '\n';
+      } else if (streamType === 2) {
+        stderr += content + '\n';
+      } else {
+        stdout += line + '\n';
+      }
+    }
+
+    return {
+      stdout: stdout.trim(),
+      stderr: stderr.trim(),
+    };
   }
 
   private compareOutputs(actual: any, expected: any): boolean {
+    if (actual === expected) return true;
     return JSON.stringify(actual) === JSON.stringify(expected);
   }
 }

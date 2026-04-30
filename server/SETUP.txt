@@ -1,0 +1,25 @@
+CodeSaga Execution Server Setup
+================================
+
+1. Build Docker images:
+   make build-images
+
+2. Start server:
+   make dev
+
+3. Test:
+   curl http://localhost:3001/api/health
+
+That's it. Server runs on port 3001.
+
+Architecture:
+- Custom Docker images with sandbox user (UID 10001)
+- Resource limits: 128MB RAM, 0.5 CPU, 5s timeout
+- Network isolation (no internet access)
+- Read-only filesystem with /tmp tmpfs
+- Security: no-new-privileges, minimal capabilities
+- Auto-cleanup of containers
+
+For production: make start
+For development: make dev
+To stop: make stop

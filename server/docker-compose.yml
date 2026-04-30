@@ -21,11 +21,16 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock:rw
       - ./src:/app/src
     depends_on:
       - redis
     restart: unless-stopped
+    # Run as root to access Docker socket
+    user: root
+    # Add Docker group permissions
+    group_add:
+      - ${DOCKER_GID:-999}
 
 volumes:
   redis-data:

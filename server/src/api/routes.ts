@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { ExecutionQueue } from '../queue/execution-queue';
 import { CONFIG } from '../config';
+import { TestCase } from '../types';
 
 const router = Router();
 const executionQueue = new ExecutionQueue();
@@ -10,8 +11,8 @@ const executionQueue = new ExecutionQueue();
 const TestCaseSchema = z.object({
   id: z.string(),
   name: z.string(),
-  input: z.any(),
-  expectedOutput: z.any(),
+  input: z.any().default({}),
+  expectedOutput: z.any().default(null),
   hidden: z.boolean(),
   weight: z.number(),
 });
@@ -33,7 +34,7 @@ router.post('/execute', async (req: Request, res: Response) => {
     const jobId = await executionQueue.addJob({
       language: validatedData.language,
       code: validatedData.code,
-      testCases: validatedData.testCases,
+      testCases: validatedData.testCases as TestCase[],
       timeout: validatedData.timeout,
       memoryLimit: validatedData.memoryLimit,
     });

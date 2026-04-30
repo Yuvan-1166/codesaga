@@ -82,6 +82,16 @@ export default function Navbar({ streakDays = 0, showDashboardLink = true }: Nav
               Skills
             </Link>
             <Link
+              href="/admin"
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 cursor-pointer ${
+                isActive('/admin')
+                  ? 'bg-purple-100 text-purple-700'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              Admin
+            </Link>
+            <Link
               href="/settings"
               className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 cursor-pointer ${
                 isActive('/settings')

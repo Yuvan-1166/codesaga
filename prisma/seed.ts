@@ -136,6 +136,51 @@ async function main() {
       {
         stackId: expressStack.id,
         internalOrder: 3,
+        conceptTags: ['node-fs', 'file-system', 'async-await'],
+        difficultyLevel: DifficultyLevel.MEDIUM,
+        isDetour: false,
+        milestoneGroup: 2,
+        starterCode: `// Node.js File System Task
+// Write a function that counts lines in a text file
+const fs = require('fs');
+
+function countLines(text) {
+  // Your code here
+  // Return the number of lines in the text
+}
+`,
+        testCases: [
+          {
+            id: 'test-1',
+            name: 'Count lines in simple text',
+            input: 'Hello\\nWorld\\nTest',
+            expectedOutput: 3,
+            hidden: false,
+            weight: 1,
+          },
+          {
+            id: 'test-2',
+            name: 'Single line',
+            input: 'Single line',
+            expectedOutput: 1,
+            hidden: false,
+            weight: 1,
+          },
+          {
+            id: 'test-3',
+            name: 'Empty text',
+            input: '',
+            expectedOutput: 0,
+            hidden: true,
+            weight: 1,
+          },
+        ],
+        language: 'javascript',
+        executionMode: 'server', // Server execution required for Node.js
+      },
+      {
+        stackId: expressStack.id,
+        internalOrder: 4,
         conceptTags: ['authentication', 'jwt', 'security'],
         difficultyLevel: DifficultyLevel.MEDIUM,
         isDetour: false,
@@ -143,11 +188,11 @@ async function main() {
       },
       {
         stackId: expressStack.id,
-        internalOrder: 4,
+        internalOrder: 5,
         conceptTags: ['database', 'crud', 'validation'],
         difficultyLevel: DifficultyLevel.HARD,
         isDetour: false,
-        milestoneGroup: 2,
+        milestoneGroup: 3,
       },
       // Detour tasks - inherit milestoneGroup from the tasks they support
       {
