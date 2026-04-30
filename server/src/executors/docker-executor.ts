@@ -123,21 +123,33 @@ const input = ${JSON.stringify(testCase.input)};
 (async () => {
   try {
     let result;
+    let hasFunction = false;
     
     // Try common function names
     if (typeof sum !== 'undefined') {
       result = await sum(input.a, input.b);
+      hasFunction = true;
     } else if (typeof filterEven !== 'undefined') {
       result = await filterEven(input);
+      hasFunction = true;
     } else if (typeof main !== 'undefined') {
       result = await main(input);
+      hasFunction = true;
     } else if (typeof solution !== 'undefined') {
       result = await solution(input);
-    } else {
-      throw new Error('No recognized function found. Define: sum, filterEven, main, or solution');
+      hasFunction = true;
+    } else if (typeof countLines !== 'undefined') {
+      result = await countLines(input);
+      hasFunction = true;
     }
     
-    console.log(JSON.stringify({ output: result }));
+    // If a function was found and executed, output the result
+    if (hasFunction) {
+      console.log(JSON.stringify({ output: result }));
+    }
+    // If no function found, the code already executed (e.g., console.log statements)
+    // Just exit successfully - output was already captured
+    
   } catch (error) {
     console.error(JSON.stringify({ error: error.message }));
     process.exit(1);
@@ -153,20 +165,31 @@ input_data = ${JSON.stringify(testCase.input)}
 
 try:
     result = None
+    has_function = False
     
     # Try common function names
     if 'sum' in dir():
         result = sum(input_data.get('a'), input_data.get('b'))
+        has_function = True
     elif 'filter_even' in dir():
         result = filter_even(input_data)
+        has_function = True
     elif 'main' in dir():
         result = main(input_data)
+        has_function = True
     elif 'solution' in dir():
         result = solution(input_data)
-    else:
-        raise Exception('No recognized function found. Define: sum, filter_even, main, or solution')
+        has_function = True
+    elif 'count_lines' in dir():
+        result = count_lines(input_data)
+        has_function = True
     
-    print(json.dumps({'output': result}))
+    # If a function was found and executed, output the result
+    if has_function:
+        print(json.dumps({'output': result}))
+    # If no function found, the code already executed
+    # Just exit successfully - output was already captured
+    
 except Exception as e:
     print(json.dumps({'error': str(e)}), file=sys.stderr)
     sys.exit(1)`;
@@ -269,15 +292,39 @@ except Exception as e:
       let output: any;
       let error: string | undefined;
 
+      // First, check if stderr contains an error JSON
+      if (stderr) {
+        try {
+          const stderrParsed = JSON.parse(stderr);
+          if (stderrParsed.error) {
+            error = stderrParsed.error;
+          }
+        } catch {
+          // stderr is not JSON, treat as error message if non-empty
+          if (stderr.trim()) {
+            error = stderr.trim();
+          }
+        }
+      }
+
+      // Then parse stdout for output
       try {
         const parsed = JSON.parse(stdout);
         if (parsed.error) {
           error = parsed.error;
-        } else {
+        } else if (parsed.output !== undefined) {
           output = parsed.output;
         }
       } catch {
+        // stdout is not JSON, use it as-is (e.g., console.log output)
         output = stdout.trim();
+      }
+
+      // If we have output but also an error about "No recognized function"
+      // it means the code executed successfully (just no function to call)
+      // Clear the error in this case
+      if (output && error && error.includes('No recognized function')) {
+        error = undefined;
       }
 
       // Get memory stats
