@@ -19,6 +19,7 @@ help:
 	@echo ""
 	@echo "🧪 Testing & Monitoring:"
 	@echo "  make test           - Run execution tests"
+	@echo "  make test-packages  - Test pre-installed packages"
 	@echo "  make health         - Check server health"
 	@echo "  make logs           - Show server logs (if running in background)"
 	@echo ""
@@ -39,6 +40,8 @@ install:
 build-images:
 	@echo "🐳 Building Docker sandbox images..."
 	@echo "   These images are used ONLY for isolated code execution"
+	@echo "   Installing common packages: express, axios, lodash (Node.js)"
+	@echo "   Installing common packages: requests, flask, numpy (Python)"
 	@echo ""
 	docker build -t codesaga-node:latest -f docker/node.Dockerfile .
 	docker build -t codesaga-python:latest -f docker/python.Dockerfile .
@@ -92,6 +95,22 @@ test:
 	@echo "🧪 Running execution tests..."
 	@chmod +x test-execution.sh
 	@./test-execution.sh
+
+# Test package availability
+test-packages:
+	@echo "📦 Testing pre-installed packages..."
+	@echo ""
+	@echo "Node.js packages:"
+	@docker run --rm codesaga-node:latest node -e "console.log('✅ express:', require('express') ? 'installed' : 'missing')"
+	@docker run --rm codesaga-node:latest node -e "console.log('✅ axios:', require('axios') ? 'installed' : 'missing')"
+	@docker run --rm codesaga-node:latest node -e "console.log('✅ lodash:', require('lodash') ? 'installed' : 'missing')"
+	@echo ""
+	@echo "Python packages:"
+	@docker run --rm codesaga-python:latest python -c "import requests; print('✅ requests: installed')"
+	@docker run --rm codesaga-python:latest python -c "import flask; print('✅ flask: installed')"
+	@docker run --rm codesaga-python:latest python -c "import numpy; print('✅ numpy: installed')"
+	@echo ""
+	@echo "✅ All packages available!"
 
 # Check server health
 health:
