@@ -28,22 +28,41 @@ model Enrollment {
   status            EnrollmentStatus @default(ACTIVE)
   checkpointPending Boolean          @default(false)
   storyLog          Json             @default("[]")
-  Stack             Stack            @relation(fields: [stackId], references: [id], onDelete: Cascade)
-  User              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  Session           Session[]
+
+  // Performance-Based Adaptive Learning
+  currentIntensity     IntensityLevel @default(STANDARD) // Dynamically adjusted
+  performanceScore     Float          @default(0.5) // 0.0 - 1.0, affects intensity
+  consecutiveSuccesses Int            @default(0) // Track winning streaks
+  consecutiveStruggles Int            @default(0) // Track struggling streaks
+
+  // Learning Path State
+  completedModuleIds String[] @default([]) // Module IDs completed
+  availableModuleIds String[] @default([]) // Computed next options
+  currentModuleId    String? // Active module
+
+  // Cached Performance Metrics (for quick access)
+  avgCompletionTime Int? // Average minutes per module
+  avgTestPassRate   Float? // Average test pass rate
+  totalHintsUsed    Int    @default(0)
+
+  Stack   Stack     @relation(fields: [stackId], references: [id], onDelete: Cascade)
+  User    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Session Session[]
 
   @@unique([userId, stackId])
   @@index([stackId])
   @@index([userId])
+  @@index([currentIntensity])
 }
 
 model Session {
-  id           String        @id @default(cuid())
-  enrollmentId String
-  startedAt    DateTime      @default(now())
-  completedAt  DateTime?
-  Enrollment   Enrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
-  TaskAttempt  TaskAttempt[]
+  id            String          @id @default(cuid())
+  enrollmentId  String
+  startedAt     DateTime        @default(now())
+  completedAt   DateTime?
+  Enrollment    Enrollment      @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  TaskAttempt   TaskAttempt[]
+  ModuleAttempt ModuleAttempt[]
 
   @@index([enrollmentId])
 }
@@ -53,9 +72,12 @@ model Stack {
   name            String
   slug            String            @unique
   description     String
+  prerequisites   String[]          @default([])
+  Assessment      Assessment[]
   ConceptProgress ConceptProgress[]
   Enrollment      Enrollment[]
   Task            Task[]
+  Module          Module[]
 
   @@index([slug])
 }
@@ -68,10 +90,10 @@ model Task {
   difficultyLevel DifficultyLevel
   isDetour        Boolean         @default(false)
   milestoneGroup  Int             @default(1)
-  testCases       Json?
-  starterCode     String?         @db.Text
-  language        String          @default("javascript")
   executionMode   String          @default("browser")
+  language        String          @default("javascript")
+  starterCode     String?
+  testCases       Json?
   Stack           Stack           @relation(fields: [stackId], references: [id], onDelete: Cascade)
   TaskAttempt     TaskAttempt[]
 
@@ -80,27 +102,81 @@ model Task {
   @@index([stackId])
 }
 
+model Module {
+  id      String @id @default(cuid())
+  stackId String
+
+  // Identity & Description
+  slug        String // e.g., "express-basic-routing"
+  title       String // "Setting Up Your First Route"
+  description String @db.Text
+
+  // Learning Graph & Classification
+  moduleType      ModuleType // CORE, PRACTICE, CHALLENGE, REMEDIAL, ASSESSMENT, INTEGRATION
+  difficultyLevel DifficultyLevel // EASY, MEDIUM, HARD
+
+  // Prerequisites (JSON structure)
+  // { "concepts": ["routing", "middleware"], "modules": ["express-setup"], "minConceptStrength": 0.5 }
+  prerequisites Json @default("{}")
+
+  // What this module teaches
+  conceptTags    String[]
+  conceptWeights Json? // { "routing": 0.7, "middleware": 0.3 } - primary vs secondary concepts
+
+  // Estimated completion time
+  estimatedMinutes Int @default(15)
+
+  // Execution Configuration
+  language      String  @default("javascript")
+  executionMode String  @default("browser") // browser, server
+  starterCode   String? @db.Text
+  solutionCode  String? @db.Text // For reference/hints
+  testCases     Json?
+
+  // Assessment-specific (for quizzes/challenges)
+  assessmentType String? // "quiz", "challenge", "checkpoint"
+  assessmentData Json? // Quiz questions, challenge criteria
+
+  // Story Integration
+  storyContext   String? @db.Text // Narrative framing
+  successMessage String? // What they accomplished
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true) // For A/B testing or deprecation
+
+  // Relationships
+  Stack         Stack           @relation(fields: [stackId], references: [id], onDelete: Cascade)
+  ModuleAttempt ModuleAttempt[]
+
+  @@unique([stackId, slug])
+  @@index([stackId, moduleType])
+  @@index([stackId, isActive])
+  @@index([difficultyLevel])
+}
+
 model TaskAttempt {
-  id             String            @id @default(cuid())
-  taskId         String
-  sessionId      String
-  userId         String
-  startedAt      DateTime          @default(now())
-  completedAt    DateTime?
-  hintsUsed      Int               @default(0)
-  status         TaskAttemptStatus @default(IN_PROGRESS)
-  messageCount   Int               @default(0)
-  originalTaskId String?
-  wasDetour      Boolean           @default(false)
-  editorState    String?
-  codeSubmitted  String?           @db.Text
-  testResults    Json?
-  passedTests    Int               @default(0)
-  totalTests     Int               @default(0)
-  Session        Session           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  Task           Task              @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  User           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String             @id @default(cuid())
+  taskId           String
+  sessionId        String
+  userId           String
+  startedAt        DateTime           @default(now())
+  completedAt      DateTime?
+  hintsUsed        Int                @default(0)
+  status           TaskAttemptStatus  @default(IN_PROGRESS)
+  messageCount     Int                @default(0)
+  originalTaskId   String?
+  wasDetour        Boolean            @default(false)
+  editorState      String?
+  codeSubmitted    String?
+  passedTests      Int                @default(0)
+  testResults      Json?
+  totalTests       Int                @default(0)
   CompanionMessage CompanionMessage[]
+  Session          Session            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  Task             Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  User             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@index([status])
@@ -108,29 +184,147 @@ model TaskAttempt {
   @@index([userId])
 }
 
+model ModuleAttempt {
+  id        String @id @default(cuid())
+  moduleId  String
+  sessionId String
+  userId    String
+
+  // Timing
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  durationSeconds Int? // Actual time spent
+
+  // Performance Metrics
+  status       ModuleAttemptStatus @default(IN_PROGRESS)
+  hintsUsed    Int                 @default(0)
+  messageCount Int                 @default(0)
+
+  // Code & Testing
+  editorState      String? @db.Text
+  codeSubmitted    String? @db.Text
+  testResults      Json?
+  passedTests      Int     @default(0)
+  totalTests       Int     @default(0)
+  firstAttemptPass Boolean @default(false)
+
+  // Assessment-specific (for quizzes/challenges)
+  assessmentScore Float? // 0.0 - 1.0
+  assessmentData  Json? // Quiz answers, challenge results
+
+  // Performance Analysis
+  performanceScore  Float? // 0.0 - 1.0, computed from multiple factors
+  struggledConcepts String[] @default([]) // Concepts user struggled with
+  masteredConcepts  String[] @default([]) // Concepts user mastered
+
+  // Context
+  wasRemedial       Boolean @default(false)
+  wasChallenge      Boolean @default(false)
+  triggeredByModule String? // If this was triggered by struggling on another module
+
+  // Relationships
+  Module           Module             @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  Session          Session            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  User             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  CompanionMessage CompanionMessage[]
+
+  @@index([moduleId])
+  @@index([sessionId])
+  @@index([userId])
+  @@index([status])
+  @@index([performanceScore])
+}
+
 model CompanionMessage {
-  id            String       @id @default(cuid())
-  taskAttemptId String
-  role          String
-  content       String       @db.Text
-  createdAt     DateTime     @default(now())
-  TaskAttempt   TaskAttempt  @relation(fields: [taskAttemptId], references: [id], onDelete: Cascade)
+  id              String         @id @default(cuid())
+  taskAttemptId   String?
+  moduleAttemptId String?
+  role            String
+  content         String
+  createdAt       DateTime       @default(now())
+  TaskAttempt     TaskAttempt?   @relation(fields: [taskAttemptId], references: [id], onDelete: Cascade)
+  ModuleAttempt   ModuleAttempt? @relation(fields: [moduleAttemptId], references: [id], onDelete: Cascade)
 
   @@index([taskAttemptId])
+  @@index([moduleAttemptId])
   @@index([createdAt])
 }
 
 model User {
-  id             String            @id @default(cuid())
-  clerkId        String            @unique
-  createdAt      DateTime          @default(now())
-  streakDays     Int               @default(0)
-  lastActiveDate DateTime?
-  ConceptProgress ConceptProgress[]
-  Enrollment      Enrollment[]
-  TaskAttempt     TaskAttempt[]
+  id                 String               @id @default(cuid())
+  clerkId            String               @unique
+  createdAt          DateTime             @default(now())
+  lastActiveDate     DateTime?
+  streakDays         Int                  @default(0)
+  learningStyle      String?
+  skillLevel         String?
+  Assessment         Assessment[]
+  AssessmentResponse AssessmentResponse[]
+  ConceptProgress    ConceptProgress[]
+  Enrollment         Enrollment[]
+  TaskAttempt        TaskAttempt[]
+  ModuleAttempt      ModuleAttempt[]
 
   @@index([clerkId])
+}
+
+model Assessment {
+  id                 String               @id
+  userId             String
+  stackId            String
+  createdAt          DateTime             @default(now())
+  completedAt        DateTime?
+  status             AssessmentStatus     @default(IN_PROGRESS)
+  score              Float?
+  skillLevelAssigned String?
+  adaptivePath       Json?
+  Stack              Stack                @relation(fields: [stackId], references: [id], onDelete: Cascade)
+  User               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  AssessmentResponse AssessmentResponse[]
+
+  @@index([stackId])
+  @@index([status])
+  @@index([userId])
+}
+
+model AssessmentQuestion {
+  id                 String               @id
+  stackSlug          String
+  questionType       QuestionType
+  questionText       String
+  codeChallenge      String?
+  options            Json?
+  correctAnswer      String
+  conceptTags        String[]
+  difficulty         DifficultyLevel
+  weight             Float                @default(1.0)
+  testCases          Json?
+  starterCode        String?
+  language           String               @default("javascript")
+  AssessmentResponse AssessmentResponse[]
+
+  @@index([questionType])
+  @@index([stackSlug])
+}
+
+model AssessmentResponse {
+  id                 String             @id
+  assessmentId       String
+  questionId         String
+  userId             String
+  answer             String
+  isCorrect          Boolean
+  timeSpent          Int
+  codeSubmitted      String?
+  testResults        Json?
+  createdAt          DateTime           @default(now())
+  Assessment         Assessment         @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  AssessmentQuestion AssessmentQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  User               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+  @@index([questionId])
+  @@index([userId])
 }
 
 enum DifficultyLevel {
@@ -148,4 +342,37 @@ enum TaskAttemptStatus {
   IN_PROGRESS
   COMPLETED
   SKIPPED
+}
+
+enum ModuleType {
+  CORE // Main learning path (required)
+  PRACTICE // Reinforcement exercises (recommended)
+  CHALLENGE // Advanced applications (optional)
+  REMEDIAL // Simplified versions for struggling learners
+  ASSESSMENT // Quizzes and checkpoints
+  INTEGRATION // Combines multiple concepts
+}
+
+enum ModuleAttemptStatus {
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  FAILED // For assessments that can be failed
+}
+
+enum IntensityLevel {
+  CASUAL // 30-50 modules, focus on core concepts
+  STANDARD // 60-80 modules, balanced depth
+  INTENSIVE // 100+ modules, deep expertise
+}
+
+enum AssessmentStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  CODING_CHALLENGE
 }
