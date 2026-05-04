@@ -82,9 +82,42 @@ export class DockerExecutor {
     const tempDir = await fs.mkdtemp(path.join(baseDir, 'exec-'));
     
     try {
-      const fileName = language === 'javascript' ? 'solution.js' : 'solution.py';
+      let fileName: string;
+      let testCode: string;
+      
+      if (language === 'javascript') {
+        // Detect ES module syntax
+        const hasESModules = this.detectESModules(code);
+        
+        fileName = 'solution.js';
+        
+        if (hasESModules) {
+          // Create package.json to enable ES modules
+          const packageJson = {
+            type: 'module',
+            name: 'user-solution',
+            version: '1.0.0',
+            description: 'User code execution sandbox'
+          };
+          
+          const packageJsonPath = path.join(tempDir, 'package.json');
+          await fs.writeFile(
+            packageJsonPath,
+            JSON.stringify(packageJson, null, 2),
+            { mode: 0o644 }
+          );
+          
+          console.log(`[Docker] Created package.json for ES modules`);
+        }
+        
+        testCode = this.generateTestCode(language, code, testCase, hasESModules);
+      } else {
+        // Python
+        fileName = 'solution.py';
+        testCode = this.generateTestCode(language, code, testCase, false);
+      }
+      
       const filePath = path.join(tempDir, fileName);
-      const testCode = this.generateTestCode(language, code, testCase);
       
       // Write file with world-readable permissions (0o644 = rw-r--r--)
       await fs.writeFile(filePath, testCode, { mode: 0o644 });
@@ -114,9 +147,28 @@ export class DockerExecutor {
     }
   }
 
-  private generateTestCode(language: Language, code: string, testCase: TestCase): string {
+  /**
+   * Detect if code uses ES module syntax
+   */
+  private detectESModules(code: string): boolean {
+    // Check for ES module import/export statements
+    const esModulePatterns = [
+      /^\s*import\s+/m,                    // import statement
+      /^\s*export\s+/m,                    // export statement
+      /^\s*import\s*\{[^}]+\}\s*from/m,   // import { ... } from
+      /^\s*import\s+\*\s+as\s+/m,         // import * as
+      /^\s*export\s+default\s+/m,         // export default
+      /^\s*export\s*\{[^}]+\}/m,          // export { ... }
+    ];
+    
+    return esModulePatterns.some(pattern => pattern.test(code));
+  }
+
+  private generateTestCode(language: Language, code: string, testCase: TestCase, isESModule: boolean = false): string {
     if (language === 'javascript') {
-      return `${code}
+      if (isESModule) {
+        // ES Module version
+        return `${code}
 
 const input = ${JSON.stringify(testCase.input)};
 
@@ -155,7 +207,50 @@ const input = ${JSON.stringify(testCase.input)};
     process.exit(1);
   }
 })();`;
+      } else {
+        // CommonJS version
+        return `${code}
+
+const input = ${JSON.stringify(testCase.input)};
+
+(async () => {
+  try {
+    let result;
+    let hasFunction = false;
+    
+    // Try common function names
+    if (typeof sum !== 'undefined') {
+      result = await sum(input.a, input.b);
+      hasFunction = true;
+    } else if (typeof filterEven !== 'undefined') {
+      result = await filterEven(input);
+      hasFunction = true;
+    } else if (typeof main !== 'undefined') {
+      result = await main(input);
+      hasFunction = true;
+    } else if (typeof solution !== 'undefined') {
+      result = await solution(input);
+      hasFunction = true;
+    } else if (typeof countLines !== 'undefined') {
+      result = await countLines(input);
+      hasFunction = true;
+    }
+    
+    // If a function was found and executed, output the result
+    if (hasFunction) {
+      console.log(JSON.stringify({ output: result }));
+    }
+    // If no function found, the code already executed (e.g., console.log statements)
+    // Just exit successfully - output was already captured
+    
+  } catch (error) {
+    console.error(JSON.stringify({ error: error.message }));
+    process.exit(1);
+  }
+})();`;
+      }
     } else {
+      // Python
       return `import json
 import sys
 
@@ -204,9 +299,18 @@ except Exception as e:
     memoryLimit: number
   ): Promise<{ output: any; stdout: string; stderr: string; error?: string; memoryUsed?: number }> {
     const imageName = CONFIG.docker.images[language];
-    const cmd = language === 'javascript' 
-      ? ['node', `/sandbox/${fileName}`] 
-      : ['python3', `/sandbox/${fileName}`];
+    
+    let cmd: string[];
+    if (language === 'javascript') {
+      // For JavaScript, copy node_modules from image and then execute
+      cmd = [
+        'sh',
+        '-c',
+        `cp -r /sandbox/node_modules /workspace/ 2>/dev/null || true && cd /workspace && node ${fileName}`
+      ];
+    } else {
+      cmd = ['python3', `/workspace/${fileName}`];
+    }
 
     console.log(`[Docker] Executing: ${cmd.join(' ')}`);
     console.log(`[Docker] Host directory: ${hostDir}`);
@@ -223,7 +327,7 @@ except Exception as e:
       Image: imageName,
       Cmd: cmd,
       User: language === 'javascript' ? 'node' : 'sandbox',
-      WorkingDir: '/sandbox',
+      WorkingDir: '/workspace',
       HostConfig: {
         // Resource limits
         Memory: memoryLimit * 1024 * 1024,
@@ -237,7 +341,7 @@ except Exception as e:
         NetworkMode: 'none',
         
         // Filesystem - mount with :Z for SELinux compatibility
-        Binds: [`${hostDir}:/sandbox:ro,Z`],
+        Binds: [`${hostDir}:/workspace:rw,Z`],
         ReadonlyRootfs: false,
         Tmpfs: {
           '/tmp': 'rw,noexec,nosuid,size=10m,mode=1777'

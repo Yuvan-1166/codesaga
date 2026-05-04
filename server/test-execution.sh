@@ -4,8 +4,8 @@ echo "🧪 Testing Code Execution Server"
 echo "================================"
 echo ""
 
-# Test JavaScript execution
-echo "📝 Test 1: JavaScript sum function"
+# Test 1: JavaScript sum function
+echo "📝 Test 1: JavaScript sum function (CommonJS)"
 RESPONSE=$(curl -s -X POST http://localhost:3001/api/execute \
   -H "Content-Type: application/json" \
   -d '{
@@ -25,15 +25,13 @@ RESPONSE=$(curl -s -X POST http://localhost:3001/api/execute \
 
 JOB_ID=$(echo $RESPONSE | grep -o '"jobId":"[^"]*"' | cut -d'"' -f4)
 echo "Job ID: $JOB_ID"
-
 sleep 2
-
 RESULT=$(curl -s http://localhost:3001/api/jobs/$JOB_ID)
 echo "Result: $RESULT"
 echo ""
 
-# Test JavaScript array filter
-echo "📝 Test 2: JavaScript filterEven function"
+# Test 2: JavaScript array filter
+echo "📝 Test 2: JavaScript filterEven function (CommonJS)"
 RESPONSE=$(curl -s -X POST http://localhost:3001/api/execute \
   -H "Content-Type: application/json" \
   -d '{
@@ -53,15 +51,13 @@ RESPONSE=$(curl -s -X POST http://localhost:3001/api/execute \
 
 JOB_ID=$(echo $RESPONSE | grep -o '"jobId":"[^"]*"' | cut -d'"' -f4)
 echo "Job ID: $JOB_ID"
-
 sleep 2
-
 RESULT=$(curl -s http://localhost:3001/api/jobs/$JOB_ID)
 echo "Result: $RESULT"
 echo ""
 
-# Test Express package
-echo "📝 Test 3: Express package"
+# Test 3: Express package (CommonJS)
+echo "📝 Test 3: Express package (CommonJS)"
 RESPONSE=$(curl -s -X POST http://localhost:3001/api/execute \
   -H "Content-Type: application/json" \
   -d '{
@@ -81,15 +77,39 @@ RESPONSE=$(curl -s -X POST http://localhost:3001/api/execute \
 
 JOB_ID=$(echo $RESPONSE | grep -o '"jobId":"[^"]*"' | cut -d'"' -f4)
 echo "Job ID: $JOB_ID"
-
 sleep 2
-
 RESULT=$(curl -s http://localhost:3001/api/jobs/$JOB_ID)
 echo "Result: $RESULT"
 echo ""
 
-# Test Lodash package
-echo "📝 Test 4: Lodash package"
+# Test 4: Express package (ES Module)
+echo "📝 Test 4: Express package (ES Module)"
+RESPONSE=$(curl -s -X POST http://localhost:3001/api/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "language": "javascript",
+    "code": "import express from \"express\";\nconst app = express();\nconsole.log(\"ES Module: Express loaded!\");",
+    "testCases": [{
+      "id": "test-1",
+      "name": "Express ES test",
+      "input": {},
+      "expectedOutput": null,
+      "hidden": false,
+      "weight": 1
+    }],
+    "timeout": 5000,
+    "memoryLimit": 128
+  }')
+
+JOB_ID=$(echo $RESPONSE | grep -o '"jobId":"[^"]*"' | cut -d'"' -f4)
+echo "Job ID: $JOB_ID"
+sleep 2
+RESULT=$(curl -s http://localhost:3001/api/jobs/$JOB_ID)
+echo "Result: $RESULT"
+echo ""
+
+# Test 5: Lodash package (CommonJS)
+echo "📝 Test 5: Lodash package (CommonJS)"
 RESPONSE=$(curl -s -X POST http://localhost:3001/api/execute \
   -H "Content-Type: application/json" \
   -d '{
@@ -109,9 +129,33 @@ RESPONSE=$(curl -s -X POST http://localhost:3001/api/execute \
 
 JOB_ID=$(echo $RESPONSE | grep -o '"jobId":"[^"]*"' | cut -d'"' -f4)
 echo "Job ID: $JOB_ID"
-
 sleep 2
+RESULT=$(curl -s http://localhost:3001/api/jobs/$JOB_ID)
+echo "Result: $RESULT"
+echo ""
 
+# Test 6: Lodash package (ES Module)
+echo "📝 Test 6: Lodash package (ES Module)"
+RESPONSE=$(curl -s -X POST http://localhost:3001/api/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "language": "javascript",
+    "code": "import _ from \"lodash\";\nconst numbers = [1, 2, 3, 4, 5];\nconst sum = _.sum(numbers);\nconsole.log(\"ES Module Sum:\", sum);",
+    "testCases": [{
+      "id": "test-1",
+      "name": "Lodash ES test",
+      "input": {},
+      "expectedOutput": null,
+      "hidden": false,
+      "weight": 1
+    }],
+    "timeout": 5000,
+    "memoryLimit": 128
+  }')
+
+JOB_ID=$(echo $RESPONSE | grep -o '"jobId":"[^"]*"' | cut -d'"' -f4)
+echo "Job ID: $JOB_ID"
+sleep 2
 RESULT=$(curl -s http://localhost:3001/api/jobs/$JOB_ID)
 echo "Result: $RESULT"
 echo ""
