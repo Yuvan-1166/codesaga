@@ -63,3 +63,29 @@ export {
   shouldOfferRemedial,
   recordTriggeredModule,
 } from './progression-tracker';
+
+// Assessment evaluation
+export {
+  evaluateQuiz,
+  evaluateCodingChallenge,
+  evaluateMixedAssessment,
+  storeAssessmentResult,
+  getAssessmentHistory,
+  hasCompletedInitialAssessment,
+} from './assessment-evaluator';
+
+export type {
+  QuizQuestion,
+  QuizAnswer,
+  CodingChallenge,
+  CodingChallengeSubmission,
+  AssessmentResult,
+} from './assessment-evaluator';
+
+// Assessment generation
+export {
+  generateInitialAssessment,
+  generateCheckpointAssessment,
+  generateAdaptiveAssessment,
+  seedExpressAssessmentQuestions,
+} from './assessment-generator';
